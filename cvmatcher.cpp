@@ -38,6 +38,11 @@ using namespace cv;
 using namespace std;
 
 
+#define SCA_BLACK   (cv::Scalar(0,0,0))
+#define SCA_RED     (cv::Scalar(0,0,255))
+#define SCA_GREEN   (cv::Scalar(0,255,0))
+
+
 bool wait_and_check_keys(Knobs& rknobs)
 {
     bool result = true;
@@ -63,12 +68,16 @@ bool wait_and_check_keys(Knobs& rknobs)
 }
 
 
-void draw_score(cv::Mat& rsrc, const std::string& rs)
+void draw_score(cv::Mat& rsrc, const double qmax)
 {
+    // format score string for viewer (#.##)
+    ostringstream oss;
+    oss << fixed << setprecision(2) << qmax;
+
     // draw black background box
-    // then draw text score (#.##) in green on top of it
-    rectangle(rsrc, { 0,0,40,16 }, { 0,0,0 }, -1);
-    putText(rsrc, rs, { 0,12 }, FONT_HERSHEY_PLAIN, 1.0, { 0,255,0 }, 1);
+    // then draw text score on top of it
+    rectangle(rsrc, { 0,0,40,16 }, SCA_BLACK, -1);
+    putText(rsrc, oss.str(), { 0,12 }, FONT_HERSHEY_PLAIN, 1.0, SCA_GREEN, 1);
 }
 
 
@@ -78,8 +87,6 @@ void loop(const int ksize)
     Knobs theKnobs;
 
     double qmax;
-    string score;
-
     Size capture_size;
     Size tmpl_offset;
     Point ptmax;
@@ -87,18 +94,19 @@ void loop(const int ksize)
     Mat img;
     Mat img_viewer;
     Mat img_gray;
+    Mat img_bgr;
     Mat img_channels[3];
     Mat tmatch;
    
     TOGMatcher tmog;
     
     //tmog.create_template_from_file("data\\circle_w_on_b.png", ksize);
-    //tmog.create_template_from_file("data\\circle_b_on_w.png", ksize);
+    tmog.create_template_from_file("data\\circle_b_on_w.png", ksize);
     //tmog.create_template_from_file("data\\open_box_w_on_b.png", ksize);
     //tmog.create_template_from_file("data\\bottle_20perc_b_on_w.png", ksize);
-    //tmog.create_template_from_file("data\\ib_cap_20perc_b_on_w.png", ksize);
-    tmog.create_template_from_file("data\\ib_top_20perc_b_on_w.png", ksize);
-    //tmog.create_template_from_file("data\\ib_curve_20perc_b_on_w.png", ksize);
+    //tmog.create_template_from_file("data\\bottle_20perc_cap_b_on_w.png", ksize);
+    //tmog.create_template_from_file("data\\bottle_20perc_top_b_on_w.png", ksize);
+    //tmog.create_template_from_file("data\\bottle_20perc_curve_b_on_w.png", ksize);
 
     Mat tdx;
     tmog.get_template_dx().convertTo(tdx, CV_8S);
@@ -175,25 +183,21 @@ void loop(const int ksize)
         tmog.perform_match(img_gray, tmatch, theKnobs.get_mask_enabled(), ksize);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
 
-        {
-            // format score string for viewer
-            ostringstream oss;
-            oss << fixed << setprecision(2) << qmax;
-            score = oss.str();
-        }
-
         // apply current output mode
+        // content varies but all final output images are BGR
         switch (theKnobs.get_output_mode())
         {
             case Knobs::OUT_RAW:
             {
                 // show the raw template match result
-                // overlayed and shifted on top of image of original size
+                // it is shifted and placed on top of blank image of original input size
                 Mat full_tmatch = Mat::zeros(img_gray.size(), CV_32F);
                 Rect roi = cv::Rect(tmpl_offset.width, tmpl_offset.height, tmatch.cols, tmatch.rows);
                 tmatch.copyTo(full_tmatch(roi));
                 normalize(full_tmatch, full_tmatch, 0, 1, cv::NORM_MINMAX);
-                imshow(stitle, full_tmatch);
+                cvtColor(full_tmatch, img_bgr, COLOR_GRAY2BGR);
+                draw_score(img_bgr, qmax);
+                imshow(stitle, img_bgr);
                 break;
             }
             case Knobs::OUT_MASK:
@@ -202,24 +206,23 @@ void loop(const int ksize)
                 // show red overlay of any matches that exceed arbitrary threshold
                 // also show the contour of the best match
                 Mat match_mask;
-                Mat img_rgb;
                 std::vector<std::vector<cv::Point>> contours;
-                cvtColor(img_gray, img_rgb, COLOR_GRAY2BGR);
+                cvtColor(img_gray, img_bgr, COLOR_GRAY2BGR);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 match_mask = (tmatch > 0.8);
                 findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-                drawContours(img_rgb, contours, -1, { 0,0,255 }, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
-                drawContours(img_rgb, tmog.get_contours(), -1, { 0,255,0 }, 1, LINE_8, noArray(), INT_MAX, ptmax);
-                draw_score(img_rgb, score);
-                imshow(stitle, img_rgb);
+                drawContours(img_bgr, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
+                drawContours(img_bgr, tmog.get_contours(), -1, SCA_GREEN, 1, LINE_8, noArray(), INT_MAX, ptmax);
+                draw_score(img_bgr, qmax);
+                imshow(stitle, img_bgr);
                 break;
             }
             case Knobs::OUT_COLOR:
             default:
             {
                 // show best match on color input image
-                drawContours(img_viewer, tmog.get_contours(), -1, { 0,255,0 }, 1, LINE_8, noArray(), INT_MAX, ptmax);
-                draw_score(img_viewer, score);
+                drawContours(img_viewer, tmog.get_contours(), -1, SCA_GREEN, 1, LINE_8, noArray(), INT_MAX, ptmax);
+                draw_score(img_viewer, qmax);
                 imshow(stitle, img_viewer);
                 break;
             }
