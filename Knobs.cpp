@@ -26,11 +26,14 @@
 
 
 Knobs::Knobs() :
+    is_op_required(false),
     is_equ_hist_enabled(false),
     is_mask_enabled(true),
+    is_record_enabled(false),
     kpreblur(7),
     nchannel(Knobs::ALL_CHANNELS),
     noutmode(Knobs::OUT_COLOR),
+    op_id(Knobs::OP_NONE),
     nimgscale(2),
     vimgscale({ 0.25, 0.325, 0.4, 0.5, 0.625, 0.75, 1.0 })
 {
@@ -61,6 +64,8 @@ void Knobs::show_help(void) const
     std::cout << "]   Increase image scale" << std::endl;
     std::cout << "e   Toggle histogram equalization" << std::endl;
     std::cout << "m   Toggle mask mode for template matching" << std::endl;
+    std::cout << "r   Toggle recording mode" << std::endl;
+    std::cout << "t   Select next template from collection" << std::endl;
     std::cout << "?   Display this help info" << std::endl;
     std::cout << std::endl;
 }
@@ -69,6 +74,8 @@ void Knobs::show_help(void) const
 void Knobs::handle_keypress(const char ckey)
 {
     bool is_valid = true;
+    
+    is_op_required = false;
     
     switch (ckey)
     {
@@ -126,6 +133,17 @@ void Knobs::handle_keypress(const char ckey)
             toggle_mask_enabled();
             break;
         }
+        case 'r':
+        {
+            toggle_record_enabled();
+            break;
+        }
+        case 't':
+        {
+            is_op_required = true;
+            op_id = 1;
+            break;
+        }
         case '?':
         {
             is_valid = false;
@@ -140,10 +158,12 @@ void Knobs::handle_keypress(const char ckey)
     }
 
     // display settings whenever valid keypress handled
-    if (is_valid)
+    // except if it's an "op required" keypress
+    if (is_valid && !is_op_required)
     {
         const std::vector<std::string> srgb({ "Blue ", "Green", "Red  ", "Gray " });
         const std::vector<std::string> sout({ "Raw  ", "Mask ", "Color" });
+        std::cout << "REC=" << is_record_enabled;
         std::cout << "  Equ=" << is_equ_hist_enabled;
         std::cout << "  Mask=" << is_mask_enabled;
         std::cout << "  PreBlur=" << kpreblur;
@@ -152,4 +172,13 @@ void Knobs::handle_keypress(const char ckey)
         std::cout << "  Scale=" << vimgscale[nimgscale];
         std::cout << std::endl;
     }
+}
+
+
+bool Knobs::get_op_flag(int& ropid)
+{
+    bool result = is_op_required;
+    ropid = op_id;
+    is_op_required = false;
+    return result;
 }

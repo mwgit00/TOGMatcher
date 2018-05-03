@@ -35,12 +35,24 @@
 
 
 using namespace cv;
-using namespace std;
 
 
 #define SCA_BLACK   (cv::Scalar(0,0,0))
 #define SCA_RED     (cv::Scalar(0,0,255))
 #define SCA_GREEN   (cv::Scalar(0,255,0))
+
+
+const std::vector<std::string> vfiles =
+{
+    ".\\data\\circle_b_on_w.png",
+    ".\\data\\open_box_w_on_b.png",
+    ".\\data\\bottle_20perc_top_b_on_w.png",
+    ".\\data\\bottle_20perc_b_on_w.png",
+    ".\\data\\bottle_20perc_cap_b_on_w.png",
+    ".\\data\\bottle_20perc_curve_b_on_w.png",
+};
+
+size_t nfile = 0U;
 
 
 bool wait_and_check_keys(Knobs& rknobs)
@@ -71,8 +83,8 @@ bool wait_and_check_keys(Knobs& rknobs)
 void draw_score(cv::Mat& rsrc, const double qmax)
 {
     // format score string for viewer (#.##)
-    ostringstream oss;
-    oss << fixed << setprecision(2) << qmax;
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << qmax;
 
     // draw black background box
     // then draw text score on top of it
@@ -81,10 +93,39 @@ void draw_score(cv::Mat& rsrc, const double qmax)
 }
 
 
+void reload_template(TOGMatcher& rtmog, const std::string& rs, const int ksize)
+{
+    const int KPAD = 4;
+    const int KW = 240;
+    const int KH = 160;
+    Mat tdx;
+    Mat tdy;
+    Mat tdxy = Mat::zeros({ KW, KH }, CV_8S);
+
+    imshow("DX and DY", tdxy);
+    
+    std::cout << "Loading template:  " << rs << std::endl;
+    rtmog.create_template_from_file(rs.c_str(), ksize);
+
+    rtmog.get_template_dx().convertTo(tdx, CV_8S);
+    rtmog.get_template_dy().convertTo(tdy, CV_8S);
+
+    // put DX and DY template images in one window
+    Size sz = rtmog.get_template_mask().size();
+    Rect roix = cv::Rect(KPAD, KPAD, rtmog.get_template_dx().cols, rtmog.get_template_dx().rows);
+    Rect roiy = cv::Rect((KW / 2) + KPAD, KPAD, rtmog.get_template_dy().cols, rtmog.get_template_dy().rows);
+    tdx.copyTo(tdxy(roix));
+    tdy.copyTo(tdxy(roiy));
+
+    imshow("DX and DY", tdxy);
+}
+
+
 void loop(const int ksize)
 {
     const char * stitle = "CVMatcher";
     Knobs theKnobs;
+    int op_id;
 
     double qmax;
     Size capture_size;
@@ -100,25 +141,6 @@ void loop(const int ksize)
    
     TOGMatcher tmog;
     
-    //tmog.create_template_from_file("data\\circle_w_on_b.png", ksize);
-    tmog.create_template_from_file("data\\circle_b_on_w.png", ksize);
-    //tmog.create_template_from_file("data\\open_box_w_on_b.png", ksize);
-    //tmog.create_template_from_file("data\\bottle_20perc_b_on_w.png", ksize);
-    //tmog.create_template_from_file("data\\bottle_20perc_cap_b_on_w.png", ksize);
-    //tmog.create_template_from_file("data\\bottle_20perc_top_b_on_w.png", ksize);
-    //tmog.create_template_from_file("data\\bottle_20perc_curve_b_on_w.png", ksize);
-
-    Mat tdx;
-    tmog.get_template_dx().convertTo(tdx, CV_8S);
-    Mat tdy;
-    tmog.get_template_dy().convertTo(tdy, CV_8S);
-    imshow("Template DX", tdx);
-    imshow("Template DY", tdy);
-
-    // use size of mask for offset used with output option
-    tmpl_offset = tmog.get_template_mask().size();
-    tmpl_offset.width /= 2;
-    tmpl_offset.height /= 2;
 
     // need a 0 as argument
     VideoCapture vcap(0);
@@ -134,14 +156,26 @@ void loop(const int ksize)
     vcap >> img;
     capture_size = img.size();
 
-    // use dummy operation to print initial Knobs help message
+    // use dummy operations to print initial Knobs help message
+    // and force template to be loaded at start of loop
     theKnobs.handle_keypress('0');
+    theKnobs.handle_keypress('t');
 
     // and the image processing loop is running...
     bool is_running = true;
 
     while (is_running)
     {
+        if (theKnobs.get_op_flag(op_id))
+        {
+            if (op_id == Knobs::OP_TEMPLATE)
+            {
+                reload_template(tmog, vfiles[nfile], ksize);
+                tmpl_offset = tmog.get_template_offset();
+                nfile = (nfile + 1) % vfiles.size();
+            }
+        }
+
         // grab image
         vcap >> img;
 
@@ -220,8 +254,10 @@ void loop(const int ksize)
             case Knobs::OUT_COLOR:
             default:
             {
-                // show best match on color input image
+                // show best match contour and target dot on color input image
+                cv::Size ptcenter = { ptmax.x + tmpl_offset.width, ptmax.y + tmpl_offset.height };
                 drawContours(img_viewer, tmog.get_contours(), -1, SCA_GREEN, 1, LINE_8, noArray(), INT_MAX, ptmax);
+                circle(img_viewer, ptcenter, 2, SCA_RED, -1);
                 draw_score(img_viewer, qmax);
                 imshow(stitle, img_viewer);
                 break;
@@ -240,6 +276,6 @@ void loop(const int ksize)
 
 int main(int argc, char** argv)
 {
-    loop(-1);
+    loop(1);
     return 0;
 }

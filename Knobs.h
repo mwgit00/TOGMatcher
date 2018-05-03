@@ -32,21 +32,36 @@ public:
     enum
     {
         ALL_CHANNELS = 3,
+    };
+
+    enum
+    {
         OUT_RAW = 0,
         OUT_MASK = 1,
         OUT_COLOR = 2,
     };
-    
+
+    enum
+    {
+        OP_NONE = 0,
+        OP_TEMPLATE = 1,
+    };
+
     Knobs();
     virtual ~Knobs();
 
     void show_help(void) const;
+
+    bool get_op_flag(int& ropid);
 
     bool get_equ_hist_enabled(void) const { return is_equ_hist_enabled; }
     void toggle_equ_hist_enabled(void) { is_equ_hist_enabled = !is_equ_hist_enabled; }
 
     bool get_mask_enabled(void) const { return is_mask_enabled; }
     void toggle_mask_enabled(void) { is_mask_enabled = !is_mask_enabled; }
+
+    bool get_record_enabled(void) const { return is_record_enabled; }
+    void toggle_record_enabled(void) { is_record_enabled = !is_record_enabled; }
 
     int get_pre_blur(void) const { return kpreblur; }
     void inc_pre_blur(void) { kpreblur = (kpreblur < 35) ? kpreblur + 2 : kpreblur; }
@@ -66,11 +81,18 @@ public:
 
 private:
 
+    // One-shot flag for signaling when extra operation needs to be done
+    // before continuing image processing loop
+    bool is_op_required;
+
     // Flag for enabling histogram equalization
     bool is_equ_hist_enabled;
 
     // Flag for enabling mask in template matching
     bool is_mask_enabled;
+
+    // Flag for enabling recording
+    bool is_record_enabled;
 
     // Amount of Gaussian blurring in preprocessing step
     int kpreblur;
@@ -80,6 +102,9 @@ private:
 
     // Output mode (raw, mask, or color)
     int noutmode;
+
+    // Type of operation that is required
+    int op_id;
 
     // Index of currently selected scale factor
     size_t nimgscale;
