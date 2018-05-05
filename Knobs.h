@@ -44,7 +44,9 @@ public:
     enum
     {
         OP_NONE = 0,
-        OP_TEMPLATE = 1,
+        OP_TEMPLATE,
+        OP_RECORD,
+        OP_MAKE_VIDEO,
     };
 
     Knobs();

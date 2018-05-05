@@ -66,6 +66,7 @@ void Knobs::show_help(void) const
     std::cout << "m   Toggle mask mode for template matching" << std::endl;
     std::cout << "r   Toggle recording mode" << std::endl;
     std::cout << "t   Select next template from collection" << std::endl;
+    std::cout << "v   Create video from files in movie folder" << std::endl;
     std::cout << "?   Display this help info" << std::endl;
     std::cout << std::endl;
 }
@@ -135,13 +136,21 @@ void Knobs::handle_keypress(const char ckey)
         }
         case 'r':
         {
+            is_op_required = true;
+            op_id = Knobs::OP_RECORD;
             toggle_record_enabled();
             break;
         }
         case 't':
         {
             is_op_required = true;
-            op_id = 1;
+            op_id = Knobs::OP_TEMPLATE;
+            break;
+        }
+        case 'v':
+        {
+            is_op_required = true;
+            op_id = Knobs::OP_MAKE_VIDEO;
             break;
         }
         case '?':
@@ -163,8 +172,7 @@ void Knobs::handle_keypress(const char ckey)
     {
         const std::vector<std::string> srgb({ "Blue ", "Green", "Red  ", "Gray " });
         const std::vector<std::string> sout({ "Raw  ", "Mask ", "Color" });
-        std::cout << "REC=" << is_record_enabled;
-        std::cout << "  Equ=" << is_equ_hist_enabled;
+        std::cout << "Equ=" << is_equ_hist_enabled;
         std::cout << "  Mask=" << is_mask_enabled;
         std::cout << "  PreBlur=" << kpreblur;
         std::cout << "  Ch=" << srgb[nchannel];

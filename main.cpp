@@ -30,6 +30,7 @@
 
 #include "TOGMatcher.h"
 #include "Knobs.h"
+#include "util.h"
 
 
 using namespace cv;
@@ -38,6 +39,11 @@ using namespace cv;
 #define SCA_BLACK   (cv::Scalar(0,0,0))
 #define SCA_RED     (cv::Scalar(0,0,255))
 #define SCA_GREEN   (cv::Scalar(0,255,0))
+#define SCA_YELLOW  (cv::Scalar(0,255,255))
+
+
+const char * stitle = "TOGMatcher";
+int n_record_ctr = 0;
 
 
 const std::vector<std::string> vfiles =
@@ -78,16 +84,38 @@ bool wait_and_check_keys(Knobs& rknobs)
 }
 
 
-void draw_score(cv::Mat& rsrc, const double qmax)
+void image_output(
+    Mat& rimg,
+    const double qmax,
+    const Point& rptmax,
+    const Knobs& rknobs,
+    TOGMatcher& rmatcher)
 {
+    const Size& roffset = rmatcher.get_template_offset();
+    Size ptcenter = { rptmax.x + roffset.width, rptmax.y + roffset.height };
+
     // format score string for viewer (#.##)
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(2) << qmax;
 
     // draw black background box
     // then draw text score on top of it
-    rectangle(rsrc, { 0,0,40,16 }, SCA_BLACK, -1);
-    putText(rsrc, oss.str(), { 0,12 }, FONT_HERSHEY_PLAIN, 1.0, SCA_GREEN, 1);
+    rectangle(rimg, { 0,0,40,16 }, SCA_BLACK, -1);
+    putText(rimg, oss.str(), { 0,12 }, FONT_HERSHEY_PLAIN, 1.0, SCA_GREEN, 1);
+
+    drawContours(rimg, rmatcher.get_contours(), -1, SCA_GREEN, 1, LINE_8, noArray(), INT_MAX, rptmax);
+    circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
+    if (rknobs.get_record_enabled())
+    {
+        std::ostringstream osx;
+        osx << ".\\movie\\img_" << std::setfill('0') << std::setw(5) << n_record_ctr << ".png";
+        imwrite(osx.str(), rimg);
+        n_record_ctr++;
+        
+        // red border around score box if recording
+        rectangle(rimg, { 0,0,40,16 }, SCA_RED, 1);
+    }
+    imshow(stitle, rimg);
 }
 
 
@@ -121,7 +149,6 @@ void reload_template(TOGMatcher& rtmog, const std::string& rs, const int ksize)
 
 void loop(const int ksize)
 {
-    const char * stitle = "CVMatcher";
     Knobs theKnobs;
     int op_id;
 
@@ -133,12 +160,10 @@ void loop(const int ksize)
     Mat img;
     Mat img_viewer;
     Mat img_gray;
-    Mat img_bgr;
     Mat img_channels[3];
     Mat tmatch;
    
     TOGMatcher tmog;
-    
 
     // need a 0 as argument
     VideoCapture vcap(0);
@@ -171,6 +196,27 @@ void loop(const int ksize)
                 reload_template(tmog, vfiles[nfile], ksize);
                 tmpl_offset = tmog.get_template_offset();
                 nfile = (nfile + 1) % vfiles.size();
+            }
+            else if (op_id == Knobs::OP_RECORD)
+            {
+                if (theKnobs.get_record_enabled())
+                {
+                    // reset recording frame counter
+                    std::cout << "RECORDING STARTED" << std::endl;
+                    n_record_ctr = 0;
+                }
+                else
+                {
+                    std::cout << "RECORDING STOPPED" << std::endl;
+                }
+            }
+            else if (op_id == Knobs::OP_MAKE_VIDEO)
+            {
+                std::cout << "CREATING VIDEO FILE..." << std::endl;
+                std::list<std::string> listOfPNG;
+                get_dir_list(".\\movie", "*.png", listOfPNG);
+                bool is_ok = make_video(15.0, ".\\movie", listOfPNG);
+                std::cout << ((is_ok) ? "SUCCESS!" : "FAILURE!") << std::endl;
             }
         }
 
@@ -227,40 +273,32 @@ void loop(const int ksize)
                 Rect roi = cv::Rect(tmpl_offset.width, tmpl_offset.height, tmatch.cols, tmatch.rows);
                 tmatch.copyTo(full_tmatch(roi));
                 normalize(full_tmatch, full_tmatch, 0, 1, cv::NORM_MINMAX);
-                cvtColor(full_tmatch, img_bgr, COLOR_GRAY2BGR);
-                draw_score(img_bgr, qmax);
-                imshow(stitle, img_bgr);
+                cvtColor(full_tmatch, img_viewer, COLOR_GRAY2BGR);
                 break;
             }
             case Knobs::OUT_MASK:
             {
                 // dispaly pre-processed gray input image
                 // show red overlay of any matches that exceed arbitrary threshold
-                // also show the contour of the best match
                 Mat match_mask;
                 std::vector<std::vector<cv::Point>> contours;
-                cvtColor(img_gray, img_bgr, COLOR_GRAY2BGR);
+                cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 match_mask = (tmatch > 0.8);
                 findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-                drawContours(img_bgr, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
-                drawContours(img_bgr, tmog.get_contours(), -1, SCA_GREEN, 1, LINE_8, noArray(), INT_MAX, ptmax);
-                draw_score(img_bgr, qmax);
-                imshow(stitle, img_bgr);
+                drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
                 break;
             }
             case Knobs::OUT_COLOR:
             default:
             {
-                // show best match contour and target dot on color input image
-                cv::Size ptcenter = { ptmax.x + tmpl_offset.width, ptmax.y + tmpl_offset.height };
-                drawContours(img_viewer, tmog.get_contours(), -1, SCA_GREEN, 1, LINE_8, noArray(), INT_MAX, ptmax);
-                circle(img_viewer, ptcenter, 2, SCA_RED, -1);
-                draw_score(img_viewer, qmax);
-                imshow(stitle, img_viewer);
+                // no extra output processing
                 break;
             }
         }
+
+        // always show best match contour and target dot on BGR image
+        image_output(img_viewer, qmax, ptmax, theKnobs, tmog);
 
         // handle keyboard events and end when ESC is pressed
         is_running = wait_and_check_keys(theKnobs);
