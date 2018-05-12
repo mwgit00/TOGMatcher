@@ -33,6 +33,10 @@
 #include "util.h"
 
 
+#define MATCH_DISPLAY_THRESHOLD (0.8)       // arbitrary
+#define MOVIE_PATH              ".\\movie"  // folder must be created by user
+
+
 using namespace cv;
 
 
@@ -130,7 +134,7 @@ void reload_template(TOGMatcher& rtmog, const std::string& rs, const int ksize)
 
     imshow("DX and DY", tdxy);
     
-    std::cout << "Loading template:  " << rs << std::endl;
+    std::cout << "Loading template (size= " << ksize << "): " << rs << std::endl;
     rtmog.create_template_from_file(rs.c_str(), ksize);
 
     rtmog.get_template_dx().convertTo(tdx, CV_8S);
@@ -147,7 +151,7 @@ void reload_template(TOGMatcher& rtmog, const std::string& rs, const int ksize)
 }
 
 
-void loop(const int ksize)
+void loop(void)
 {
     Knobs theKnobs;
     int op_id;
@@ -163,7 +167,8 @@ void loop(const int ksize)
     Mat img_channels[3];
     Mat tmatch;
    
-    TOGMatcher tmog;
+    TOGMatcher togm;
+    Ptr<CLAHE> pCLAHE = createCLAHE();
 
     // need a 0 as argument
     VideoCapture vcap(0);
@@ -179,23 +184,33 @@ void loop(const int ksize)
     vcap >> img;
     capture_size = img.size();
 
-    // use dummy operations to print initial Knobs help message
+    // use dummy operation to print initial Knobs settings message
     // and force template to be loaded at start of loop
     theKnobs.handle_keypress('0');
-    theKnobs.handle_keypress('t');
+
+    // initialize template
+    reload_template(togm, vfiles[nfile], theKnobs.get_ksize());
+    tmpl_offset = togm.get_template_offset();
 
     // and the image processing loop is running...
     bool is_running = true;
 
     while (is_running)
     {
+        // check for any operations that
+        // might halt or reset the image processing loop
         if (theKnobs.get_op_flag(op_id))
         {
-            if (op_id == Knobs::OP_TEMPLATE)
+            if (op_id == Knobs::OP_TEMPLATE || op_id == Knobs::OP_KSIZE)
             {
-                reload_template(tmog, vfiles[nfile], ksize);
-                tmpl_offset = tmog.get_template_offset();
-                nfile = (nfile + 1) % vfiles.size();
+                // changing the template or template kernel size requires a reload
+                // changing the template will advance the file index
+                if (op_id == Knobs::OP_TEMPLATE)
+                {
+                    nfile = (nfile + 1) % vfiles.size();
+                }
+                reload_template(togm, vfiles[nfile], theKnobs.get_ksize());
+                tmpl_offset = togm.get_template_offset();
             }
             else if (op_id == Knobs::OP_RECORD)
             {
@@ -214,8 +229,8 @@ void loop(const int ksize)
             {
                 std::cout << "CREATING VIDEO FILE..." << std::endl;
                 std::list<std::string> listOfPNG;
-                get_dir_list(".\\movie", "*.png", listOfPNG);
-                bool is_ok = make_video(15.0, ".\\movie", listOfPNG);
+                get_dir_list(MOVIE_PATH, "*.png", listOfPNG);
+                bool is_ok = make_video(15.0, MOVIE_PATH, listOfPNG);
                 std::cout << ((is_ok) ? "SUCCESS!" : "FAILURE!") << std::endl;
             }
         }
@@ -223,18 +238,18 @@ void loop(const int ksize)
         // grab image
         vcap >> img;
 
-        // apply current image scale setting
+        // apply the current image scale setting
         double img_scale = theKnobs.get_img_scale();
         Size viewer_size = Size(
             static_cast<int>(capture_size.width * img_scale),
             static_cast<int>(capture_size.height * img_scale));
         resize(img, img_viewer, viewer_size);
         
-        // apply current channel setting
+        // apply the current channel setting
         int nchan = theKnobs.get_channel();
         if (nchan == Knobs::ALL_CHANNELS)
         {
-            // convert to grayscale
+            // combine all channels into grayscale
             cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
         }
         else
@@ -244,13 +259,15 @@ void loop(const int ksize)
             img_gray = img_channels[nchan];
         }
         
-        // apply current histogram equalization setting
+        // apply the current histogram equalization setting
         if (theKnobs.get_equ_hist_enabled())
         {
-            equalizeHist(img_gray, img_gray);
+            double c = theKnobs.get_clip_limit();
+            pCLAHE->setClipLimit(c);
+            pCLAHE->apply(img_gray, img_gray);
         }
 
-        // apply current pre-processing blur
+        // apply the current blur setting
         int kblur = theKnobs.get_pre_blur();
         if (kblur >= 3)
         {
@@ -258,10 +275,10 @@ void loop(const int ksize)
         }
 
         // perform template match and locate maximum (best match)
-        tmog.perform_match(img_gray, tmatch, theKnobs.get_mask_enabled(), ksize);
+        togm.perform_match(img_gray, tmatch, theKnobs.get_mask_enabled(), theKnobs.get_ksize());
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
 
-        // apply current output mode
+        // apply the current output mode
         // content varies but all final output images are BGR
         switch (theKnobs.get_output_mode())
         {
@@ -284,7 +301,7 @@ void loop(const int ksize)
                 std::vector<std::vector<cv::Point>> contours;
                 cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
-                match_mask = (tmatch > 0.8);
+                match_mask = (tmatch > MATCH_DISPLAY_THRESHOLD);
                 findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
                 drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
                 break;
@@ -298,7 +315,7 @@ void loop(const int ksize)
         }
 
         // always show best match contour and target dot on BGR image
-        image_output(img_viewer, qmax, ptmax, theKnobs, tmog);
+        image_output(img_viewer, qmax, ptmax, theKnobs, togm);
 
         // handle keyboard events and end when ESC is pressed
         is_running = wait_and_check_keys(theKnobs);
@@ -312,6 +329,6 @@ void loop(const int ksize)
 
 int main(int argc, char** argv)
 {
-    loop(1);
+    loop();
     return 0;
 }

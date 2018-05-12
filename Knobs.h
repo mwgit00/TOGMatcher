@@ -45,6 +45,7 @@ public:
     {
         OP_NONE = 0,
         OP_TEMPLATE,
+        OP_KSIZE,
         OP_RECORD,
         OP_MAKE_VIDEO,
     };
@@ -69,6 +70,10 @@ public:
     void inc_pre_blur(void) { kpreblur = (kpreblur < 35) ? kpreblur + 2 : kpreblur; }
     void dec_pre_blur(void) { kpreblur = (kpreblur > 1) ? kpreblur - 2 : kpreblur; };
 
+    int get_clip_limit(void) const { return kcliplimit; }
+    void inc_clip_limit(void) { kcliplimit = (kcliplimit < 20) ? kcliplimit + 1 : kcliplimit; }
+    void dec_clip_limit(void) { kcliplimit = (kcliplimit > 0) ? kcliplimit - 1 : kcliplimit; };
+
     int get_channel(void) const { return nchannel; }
     void set_channel(const int n) { nchannel = n; }
 
@@ -78,6 +83,10 @@ public:
     double get_img_scale(void) const { return vimgscale[nimgscale]; }
     void inc_img_scale(void) { nimgscale = (nimgscale < (vimgscale.size() - 1)) ? nimgscale + 1 : nimgscale; }
     void dec_img_scale(void) { nimgscale = (nimgscale > 0) ? nimgscale - 1 : nimgscale; };
+
+    double get_ksize(void) const { return vksize[nksize]; }
+    void inc_ksize(void) { nksize = (nksize < (vksize.size() - 1)) ? nksize + 1 : nksize; }
+    void dec_ksize(void) { nksize = (nksize > 0) ? nksize - 1 : nksize; };
 
     void handle_keypress(const char c);
 
@@ -99,6 +108,9 @@ private:
     // Amount of Gaussian blurring in preprocessing step
     int kpreblur;
 
+    // Clip limit for CLAHE
+    int kcliplimit;
+
     // Channel selection (B,G,R, or Gray)
     int nchannel;
 
@@ -110,9 +122,15 @@ private:
 
     // Index of currently selected scale factor
     size_t nimgscale;
-    
+
+    // Index of currently selected Sobel kernel size
+    size_t nksize;
+
     // Array of supported scale factors
     std::vector<double> vimgscale;
+
+    // Array of supported Sobel kernel sizes
+    std::vector<int> vksize;
 };
 
 #endif // KNOBS_H_

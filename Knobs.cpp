@@ -27,15 +27,18 @@
 
 Knobs::Knobs() :
     is_op_required(false),
-    is_equ_hist_enabled(false),
+    is_equ_hist_enabled(true),
     is_mask_enabled(true),
     is_record_enabled(false),
     kpreblur(7),
+    kcliplimit(4),
     nchannel(Knobs::ALL_CHANNELS),
     noutmode(Knobs::OUT_COLOR),
     op_id(Knobs::OP_NONE),
-    nimgscale(2),
-    vimgscale({ 0.25, 0.325, 0.4, 0.5, 0.625, 0.75, 1.0 })
+    nimgscale(3),
+    nksize(1),
+    vimgscale({ 0.25, 0.325, 0.4, 0.5, 0.625, 0.75, 1.0 }),
+    vksize({ -1, 1, 3, 5, 7})
 {
 }
 
@@ -60,8 +63,12 @@ void Knobs::show_help(void) const
     std::cout << "0   Output best match result on color image" << std::endl;
     std::cout << "-   Decrease pre-blur" << std::endl;
     std::cout << "=   Increase pre-blur" << std::endl;
+    std::cout << "_   Decrease CLAHE clip limit" << std::endl;
+    std::cout << "+   Increase CLAHE clip limit" << std::endl;
     std::cout << "[   Decrease image scale" << std::endl;
     std::cout << "]   Increase image scale" << std::endl;
+    std::cout << "{   Decrease Sobel kernel size" << std::endl;
+    std::cout << "}   Increase Sobel kernel size" << std::endl;
     std::cout << "e   Toggle histogram equalization" << std::endl;
     std::cout << "m   Toggle mask mode for template matching" << std::endl;
     std::cout << "r   Toggle recording mode" << std::endl;
@@ -104,6 +111,16 @@ void Knobs::handle_keypress(const char ckey)
             set_output_mode(Knobs::OUT_COLOR);
             break;
         }
+        case '+':
+        {
+            inc_clip_limit();
+            break;
+        }
+        case '_':
+        {
+            dec_clip_limit();
+            break;
+        }
         case '=':
         {
             inc_pre_blur();
@@ -122,6 +139,20 @@ void Knobs::handle_keypress(const char ckey)
         case '[':
         {
             dec_img_scale();
+            break;
+        }
+        case '}':
+        {
+            inc_ksize();
+            is_op_required = true;
+            op_id = Knobs::OP_KSIZE;
+            break;
+        }
+        case '{':
+        {
+            dec_ksize();
+            is_op_required = true;
+            op_id = Knobs::OP_KSIZE;
             break;
         }
         case 'e':
@@ -174,7 +205,8 @@ void Knobs::handle_keypress(const char ckey)
         const std::vector<std::string> sout({ "Raw  ", "Mask ", "Color" });
         std::cout << "Equ=" << is_equ_hist_enabled;
         std::cout << "  Mask=" << is_mask_enabled;
-        std::cout << "  PreBlur=" << kpreblur;
+        std::cout << "  Blur=" << kpreblur;
+        std::cout << "  Clip=" << kcliplimit;
         std::cout << "  Ch=" << srgb[nchannel];
         std::cout << "  Out=" << sout[noutmode];
         std::cout << "  Scale=" << vimgscale[nimgscale];
