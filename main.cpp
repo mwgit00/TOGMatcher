@@ -58,6 +58,7 @@ const std::vector<T_file_info> vfiles =
     { 0.00, "bottle_20perc_curve_b_on_w.png"},
     { 0.20, "outlet_cover.png"},
     { 0.20, "outlet_holes.png" },
+    { 0.50, "panda_face.png"}
 };
 
 size_t nfile = 0U;
@@ -107,7 +108,7 @@ void image_output(
     rectangle(rimg, { 0,0,40,16 }, SCA_BLACK, -1);
     putText(rimg, oss.str(), { 0,12 }, FONT_HERSHEY_PLAIN, 1.0, SCA_GREEN, 1);
 
-    drawContours(rimg, rmatcher.get_contours(), -1, SCA_GREEN, 1, LINE_8, noArray(), INT_MAX, rptmax);
+    drawContours(rimg, rmatcher.get_contours(), -1, SCA_GREEN, 2, LINE_8, noArray(), INT_MAX, rptmax);
     circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
     if (rknobs.get_record_enabled())
     {
