@@ -34,7 +34,8 @@
 
 
 #define MATCH_DISPLAY_THRESHOLD (0.8)       // arbitrary
-#define MOVIE_PATH              ".\\movie"  // folder must be created by user
+#define MOVIE_PATH              ".\\movie\\"  // user may need to create or change this
+#define DATA_PATH               ".\\data\\"   // user may need to change this
 
 
 using namespace cv;
@@ -50,14 +51,13 @@ const char * stitle = "TOGMatcher";
 int n_record_ctr = 0;
 
 
-const std::vector<std::string> vfiles =
+const std::vector<T_file_info> vfiles =
 {
-    ".\\data\\circle_b_on_w.png",
-    ".\\data\\open_box_w_on_b.png",
-    ".\\data\\bottle_20perc_top_b_on_w.png",
-    ".\\data\\bottle_20perc_b_on_w.png",
-    ".\\data\\bottle_20perc_cap_b_on_w.png",
-    ".\\data\\bottle_20perc_curve_b_on_w.png",
+    { 0.00, "circle_b_on_w.png"},
+    { 0.00, "bottle_20perc_top_b_on_w.png"},
+    { 0.00, "bottle_20perc_curve_b_on_w.png"},
+    { 0.20, "outlet_cover.png"},
+    { 0.20, "outlet_holes.png" },
 };
 
 size_t nfile = 0U;
@@ -112,7 +112,7 @@ void image_output(
     if (rknobs.get_record_enabled())
     {
         std::ostringstream osx;
-        osx << ".\\movie\\img_" << std::setfill('0') << std::setw(5) << n_record_ctr << ".png";
+        osx << MOVIE_PATH << "img_" << std::setfill('0') << std::setw(5) << n_record_ctr << ".png";
         imwrite(osx.str(), rimg);
         n_record_ctr++;
         
@@ -123,31 +123,40 @@ void image_output(
 }
 
 
-void reload_template(TOGMatcher& rtmog, const std::string& rs, const int ksize)
+void reload_template(TOGMatcher& rtogm, const T_file_info& rinfo, const int ksize)
 {
+    const char * sxymtitle = "DX, DY, and Mask";
     const int KPAD = 4;
-    const int KW = 240;
+    const int KW = 300;
     const int KH = 160;
     Mat tdx;
     Mat tdy;
-    Mat tdxy = Mat::zeros({ KW, KH }, CV_8S);
+    Mat tmask;
+    Mat tdxdym = Mat::zeros({ KW, KH }, CV_8S);
+    std::string spath = DATA_PATH + rinfo.sname;
 
-    imshow("DX and DY", tdxy);
+    imshow(sxymtitle, tdxdym);
     
-    std::cout << "Loading template (size= " << ksize << "): " << rs << std::endl;
-    rtmog.create_template_from_file(rs.c_str(), ksize);
+    std::cout << "Loading template (size= " << ksize << "): " << rinfo.sname << std::endl;
+    rtogm.create_template_from_file(spath.c_str(), ksize, rinfo.mag_thr);
 
-    rtmog.get_template_dx().convertTo(tdx, CV_8S);
-    rtmog.get_template_dy().convertTo(tdy, CV_8S);
+    rtogm.get_template_dx().convertTo(tdx, CV_8S);
+    rtogm.get_template_dy().convertTo(tdy, CV_8S);
+    rtogm.get_template_mask().convertTo(tmask, CV_8S);
+    normalize(tmask, tmask, -127, 127, NORM_MINMAX);
 
-    // put DX and DY template images in one window
-    Size sz = rtmog.get_template_mask().size();
-    Rect roix = cv::Rect(KPAD, KPAD, rtmog.get_template_dx().cols, rtmog.get_template_dx().rows);
-    Rect roiy = cv::Rect((KW / 2) + KPAD, KPAD, rtmog.get_template_dy().cols, rtmog.get_template_dy().rows);
-    tdx.copyTo(tdxy(roix));
-    tdy.copyTo(tdxy(roiy));
+    // put DX and DY and mask template images in one window
+    int ncols = rtogm.get_template_dx().cols;
+    int nrows = rtogm.get_template_dx().rows;
+    Size sz = rtogm.get_template_mask().size();
+    Rect roix = cv::Rect(KPAD, KPAD, ncols, nrows);
+    Rect roiy = cv::Rect((KW / 3) + KPAD, KPAD, ncols, nrows);
+    Rect roim = cv::Rect(((2 * KW) / 3) + KPAD, KPAD, ncols, nrows);
+    tdx.copyTo(tdxdym(roix));
+    tdy.copyTo(tdxdym(roiy));
+    tmask.copyTo(tdxdym(roim));
 
-    imshow("DX and DY", tdxy);
+    imshow(sxymtitle, tdxdym);
 }
 
 
@@ -158,7 +167,6 @@ void loop(void)
 
     double qmax;
     Size capture_size;
-    Size tmpl_offset;
     Point ptmax;
     
     Mat img;
@@ -190,7 +198,6 @@ void loop(void)
 
     // initialize template
     reload_template(togm, vfiles[nfile], theKnobs.get_ksize());
-    tmpl_offset = togm.get_template_offset();
 
     // and the image processing loop is running...
     bool is_running = true;
@@ -210,7 +217,6 @@ void loop(void)
                     nfile = (nfile + 1) % vfiles.size();
                 }
                 reload_template(togm, vfiles[nfile], theKnobs.get_ksize());
-                tmpl_offset = togm.get_template_offset();
             }
             else if (op_id == Knobs::OP_RECORD)
             {
@@ -286,19 +292,21 @@ void loop(void)
             {
                 // show the raw template match result
                 // it is shifted and placed on top of blank image of original input size
+                const Size& tmpl_offset = togm.get_template_offset();
                 Mat full_tmatch = Mat::zeros(img_gray.size(), CV_32F);
-                Rect roi = cv::Rect(tmpl_offset.width, tmpl_offset.height, tmatch.cols, tmatch.rows);
+                Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, tmatch.cols, tmatch.rows);
+                normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 tmatch.copyTo(full_tmatch(roi));
-                normalize(full_tmatch, full_tmatch, 0, 1, cv::NORM_MINMAX);
                 cvtColor(full_tmatch, img_viewer, COLOR_GRAY2BGR);
                 break;
             }
             case Knobs::OUT_MASK:
             {
-                // dispaly pre-processed gray input image
+                // display pre-processed gray input image
                 // show red overlay of any matches that exceed arbitrary threshold
                 Mat match_mask;
                 std::vector<std::vector<cv::Point>> contours;
+                const Size& tmpl_offset = togm.get_template_offset();
                 cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 match_mask = (tmatch > MATCH_DISPLAY_THRESHOLD);

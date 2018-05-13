@@ -72,7 +72,7 @@ void TOGMatcher::create_templates(const cv::Mat& rsrc, const int ksize, const do
 
     // find external contour of magnitude mask
     // then find minimal bounding box around it
-    cv::findContours(temp_mask, src_contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+    cv::findContours(temp_mask, src_contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
     for (size_t i = 0; i < src_contours.size(); i++)
     {
         all_pts.insert(all_pts.end(), src_contours[i].begin(), src_contours[i].end());

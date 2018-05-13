@@ -36,7 +36,7 @@ Knobs::Knobs() :
     noutmode(Knobs::OUT_COLOR),
     op_id(Knobs::OP_NONE),
     nimgscale(3),
-    nksize(1),
+    nksize(4),
     vimgscale({ 0.25, 0.325, 0.4, 0.5, 0.625, 0.75, 1.0 }),
     vksize({ -1, 1, 3, 5, 7})
 {
