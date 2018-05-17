@@ -33,9 +33,9 @@
 #include "util.h"
 
 
-#define MATCH_DISPLAY_THRESHOLD (0.8)       // arbitrary
-#define MOVIE_PATH              ".\\movie\\"  // user may need to create or change this
-#define DATA_PATH               ".\\data\\"   // user may need to change this
+#define MATCH_DISPLAY_THRESHOLD (0.8)           // arbitrary
+#define MOVIE_PATH              ".\\movie\\"    // user may need to create or change this
+#define DATA_PATH               ".\\data\\"     // user may need to change this
 
 
 using namespace cv;
@@ -108,8 +108,11 @@ void image_output(
     rectangle(rimg, { 0,0,40,16 }, SCA_BLACK, -1);
     putText(rimg, oss.str(), { 0,12 }, FONT_HERSHEY_PLAIN, 1.0, SCA_GREEN, 1);
 
+    // draw contours of best match with a yellow dot in the center
     drawContours(rimg, rmatcher.get_contours(), -1, SCA_GREEN, 2, LINE_8, noArray(), INT_MAX, rptmax);
     circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
+    
+    // save each frame to a file if recording
     if (rknobs.get_record_enabled())
     {
         std::ostringstream osx;
@@ -120,6 +123,7 @@ void image_output(
         // red border around score box if recording
         rectangle(rimg, { 0,0,40,16 }, SCA_RED, 1);
     }
+    
     imshow(stitle, rimg);
 }
 
@@ -136,17 +140,19 @@ void reload_template(TOGMatcher& rtogm, const T_file_info& rinfo, const int ksiz
     Mat tdxdym = Mat::zeros({ KW, KH }, CV_8S);
     std::string spath = DATA_PATH + rinfo.sname;
 
+    // clear the window
     imshow(sxymtitle, tdxdym);
     
     std::cout << "Loading template (size= " << ksize << "): " << rinfo.sname << std::endl;
     rtogm.create_template_from_file(spath.c_str(), ksize, rinfo.mag_thr);
 
+    // convert copies of template images into formats suitable for display
     rtogm.get_template_dx().convertTo(tdx, CV_8S);
     rtogm.get_template_dy().convertTo(tdy, CV_8S);
     rtogm.get_template_mask().convertTo(tmask, CV_8S);
     normalize(tmask, tmask, -127, 127, NORM_MINMAX);
 
-    // put DX and DY and mask template images in one window
+    // put DX and DY and mask template images side-by-side in one image
     int ncols = rtogm.get_template_dx().cols;
     int nrows = rtogm.get_template_dx().rows;
     Size sz = rtogm.get_template_mask().size();
@@ -157,6 +163,7 @@ void reload_template(TOGMatcher& rtogm, const T_file_info& rinfo, const int ksiz
     tdy.copyTo(tdxdym(roiy));
     tmask.copyTo(tdxdym(roim));
 
+    // display the template images
     imshow(sxymtitle, tdxdym);
 }
 
