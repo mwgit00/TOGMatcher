@@ -60,6 +60,8 @@ void get_dir_list(
 bool make_video(
     const double fps,
     const std::string& rspath,
+    const std::string& rsname,
+    const int iFOURCC,
     const std::list<std::string>& rListOfPNG)
 {
     bool result = false;
@@ -70,12 +72,10 @@ bool make_video(
     cv::Mat img = cv::imread(rs);
     cv::Size img_sz = img.size();
 
-    std::string sname = rspath + "\\movie.wmv";
+    std::string sname = rspath + "\\" + rsname;
 
     // build movie from separate frames
-    cv::VideoWriter vw = cv::VideoWriter(sname,
-        CV_FOURCC('W', 'M', 'V', '2'),
-        fps, img_sz);
+    cv::VideoWriter vw = cv::VideoWriter(sname, iFOURCC, fps, img_sz);
 
     if (vw.isOpened())
     {

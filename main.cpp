@@ -58,7 +58,8 @@ const std::vector<T_file_info> vfiles =
     { 0.00, "bottle_20perc_curve_b_on_w.png"},
     { 0.20, "outlet_cover.png"},
     { 0.20, "outlet_holes.png" },
-    { 0.50, "panda_face.png"}
+    { 0.50, "panda_face.png"},
+    { 0.00, "stars_main.png"}
 };
 
 size_t nfile = 0U;
@@ -132,7 +133,7 @@ void reload_template(TOGMatcher& rtogm, const T_file_info& rinfo, const int ksiz
 {
     const char * sxymtitle = "DX, DY, and Mask";
     const int KPAD = 4;
-    const int KW = 300;
+    const int KW = 480;
     const int KH = 160;
     Mat tdx;
     Mat tdy;
@@ -244,7 +245,10 @@ void loop(void)
                 std::cout << "CREATING VIDEO FILE..." << std::endl;
                 std::list<std::string> listOfPNG;
                 get_dir_list(MOVIE_PATH, "*.png", listOfPNG);
-                bool is_ok = make_video(15.0, MOVIE_PATH, listOfPNG);
+                bool is_ok = make_video(15.0, MOVIE_PATH,
+                    "movie.mov",
+                    CV_FOURCC('M', 'P', '4', 'V'),
+                    listOfPNG);
                 std::cout << ((is_ok) ? "SUCCESS!" : "FAILURE!") << std::endl;
             }
         }

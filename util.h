@@ -38,10 +38,19 @@ void get_dir_list(
     const std::string& rspattern,
     std::list<std::string>& listOfFiles);
 
-// Use OpenCV routine to make video from a list of files
+// Use OpenCV routine to make video from a list of files.
+// Here are some extension and FOURCC combos that should work in Windows:
+// "movie.wmv", CV_FOURCC('W', 'M', 'V', '2')
+// "movie.avi", CV_FOURCC('M', 'J', 'P', 'G')
+// "movie.avi", CV_FOURCC('M', 'P', '4', '2')
+// "movie.avi", CV_FOURCC('M', 'P', '4', 'V')  -- error messages but VLC can play it
+// "movie.mov", CV_FOURCC('M', 'P', '4', 'V')  -- error messages but VLC can play it, iMovie can import it
+// "movie.mov", CV_FOURCC('M', 'J', 'P', 'G')  -- error messages but VLC can play it, iMovie can import it
 bool make_video(
     const double fps,
     const std::string& rspath,
+    const std::string& rsname,
+    const int iFOURCC,
     const std::list<std::string>& rListOfPNG);
 
 #endif // UTIL_H_
