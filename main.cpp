@@ -29,6 +29,7 @@
 #include <sstream>
 #include <iomanip>
 
+#include "BWCornerFinder.h"
 #include "TOGMatcher.h"
 #include "Knobs.h"
 #include "util.h"
@@ -96,9 +97,8 @@ void image_output(
     const double qmax,
     const Point& rptmax,
     const Knobs& rknobs,
-    TOGMatcher& rmatcher)
+    const cv::Size& roffset)
 {
-    const Size& roffset = rmatcher.get_template_offset();
     Size ptcenter = { rptmax.x + roffset.width, rptmax.y + roffset.height };
 
     // format score string for viewer (#.##)
@@ -110,8 +110,10 @@ void image_output(
     rectangle(rimg, { 0,0,40,16 }, SCA_BLACK, -1);
     putText(rimg, oss.str(), { 0,12 }, FONT_HERSHEY_PLAIN, 1.0, SCA_GREEN, 1);
 
+#if 0
     // draw contours of best match with a yellow dot in the center
     drawContours(rimg, rmatcher.get_contours(), -1, SCA_GREEN, 2, LINE_8, noArray(), INT_MAX, rptmax);
+#endif
     circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
     
     // save each frame to a file if recording
@@ -167,6 +169,145 @@ void reload_template(TOGMatcher& rtogm, const T_file_info& rinfo, const int ksiz
 
     // display the template images
     imshow(sxymtitle, tdxdym);
+}
+
+
+void loop2(void)
+{
+	Knobs theKnobs;
+	int op_id;
+
+	double qmax;
+	Size capture_size;
+	Point ptmax;
+
+	Mat img;
+	Mat img_viewer;
+	Mat img_gray;
+	Mat img_channels[3];
+	Mat tmatch;
+
+	BWCornerFinder bwcf;
+	Ptr<CLAHE> pCLAHE = createCLAHE();
+
+	// need a 0 as argument
+	VideoCapture vcap(0);
+	if (!vcap.isOpened())
+	{
+		std::cout << "Failed to open VideoCapture device!" << std::endl;
+		///////
+		return;
+		///////
+	}
+
+
+	// camera is ready so grab a first image to determine its full size
+	vcap >> img;
+	capture_size = img.size();
+
+	// use dummy operation to print initial Knobs settings message
+	// and force template to be loaded at start of loop
+	theKnobs.handle_keypress('0');
+
+    bwcf.init(15);// theKnobs.get_ksize());
+
+    // and the image processing loop is running...
+    bool is_running = true;
+
+    while (is_running)
+    {
+        // grab image
+        vcap >> img;
+
+        // apply the current image scale setting
+        double img_scale = theKnobs.get_img_scale();
+        Size viewer_size = Size(
+            static_cast<int>(capture_size.width * img_scale),
+            static_cast<int>(capture_size.height * img_scale));
+        resize(img, img_viewer, viewer_size);
+
+        // apply the current channel setting
+        int nchan = theKnobs.get_channel();
+        if (nchan == Knobs::ALL_CHANNELS)
+        {
+            // combine all channels into grayscale
+            cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
+        }
+        else
+        {
+            // select only one BGR channel
+            split(img_viewer, img_channels);
+            img_gray = img_channels[nchan];
+        }
+
+        // apply the current histogram equalization setting
+        if (theKnobs.get_equ_hist_enabled())
+        {
+            double c = theKnobs.get_clip_limit();
+            pCLAHE->setClipLimit(c);
+            pCLAHE->apply(img_gray, img_gray);
+        }
+
+        // apply the current blur setting
+        int kblur = theKnobs.get_pre_blur();
+        if (kblur >= 3)
+        {
+            GaussianBlur(img_gray, img_gray, { kblur, kblur }, 0, 0);
+        }
+
+        // perform template match and locate maximum (best match)
+        bwcf.perform_match(img_gray, tmatch);
+        minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
+
+        // apply the current output mode
+        // content varies but all final output images are BGR
+        switch (theKnobs.get_output_mode())
+        {
+            case Knobs::OUT_RAW:
+            {
+                // show the raw template match result
+                // it is shifted and placed on top of blank image of original input size
+                const Size& tmpl_offset = bwcf.get_template_offset();
+                Mat full_tmatch = Mat::zeros(img_gray.size(), CV_32F);
+                Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, tmatch.cols, tmatch.rows);
+                normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
+                tmatch.copyTo(full_tmatch(roi));
+                cvtColor(full_tmatch, img_viewer, COLOR_GRAY2BGR);
+                break;
+            }
+            case Knobs::OUT_MASK:
+            {
+                // display pre-processed gray input image
+                // show red overlay of any matches that exceed arbitrary threshold
+                Mat match_mask;
+                std::vector<std::vector<cv::Point>> contours;
+                const Size& tmpl_offset = bwcf.get_template_offset();
+                cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
+                normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
+                match_mask = (tmatch > MATCH_DISPLAY_THRESHOLD);
+                findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+                drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
+                break;
+            }
+            case Knobs::OUT_COLOR:
+            default:
+            {
+                // no extra output processing
+                break;
+            }
+        }
+
+        // always show best match contour and target dot on BGR image
+        image_output(img_viewer, qmax, ptmax, theKnobs, bwcf.get_template_offset());
+
+        // handle keyboard events and end when ESC is pressed
+        is_running = wait_and_check_keys(theKnobs);
+
+    }
+
+    // when everything is done, release the capture device and windows
+    vcap.release();
+    destroyAllWindows();
 }
 
 
@@ -336,7 +477,7 @@ void loop(void)
         }
 
         // always show best match contour and target dot on BGR image
-        image_output(img_viewer, qmax, ptmax, theKnobs, togm);
+        image_output(img_viewer, qmax, ptmax, theKnobs, togm.get_template_offset());
 
         // handle keyboard events and end when ESC is pressed
         is_running = wait_and_check_keys(theKnobs);
@@ -350,6 +491,6 @@ void loop(void)
 
 int main(int argc, char** argv)
 {
-    loop();
+    loop2();
     return 0;
 }
