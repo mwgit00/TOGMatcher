@@ -53,14 +53,17 @@ public:
     } grid_colors_t;
 
     const grid_colors_t PATTERN_0 = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN };
-    const grid_colors_t PATTERN_1 = { bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK };
+    const grid_colors_t PATTERN_1 = { bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK };
+    const grid_colors_t PATTERN_2 = { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW };
+    const grid_colors_t PATTERN_3 = { bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK };
 	
+
     BGRLandmark();
 	virtual ~BGRLandmark();
 
     void init(
         const int k = 7,
-        const grid_colors_t& r = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN },
+        const grid_colors_t& rcolors = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN },
         const int mode = cv::TM_SQDIFF_NORMED);
 
 	void perform_match(
@@ -69,10 +72,21 @@ public:
 
     const cv::Size& get_template_offset(void) const { return tmpl_offset; }
 
+    static void create_template_image(cv::Mat& rimg, const int k, const grid_colors_t& rcolors);
+
     static void create_landmark_image(
         cv::Mat& rimg,
         const int k,
-        const grid_colors_t& r,
+        const grid_colors_t& rcolors,
+        const int kborder = 4,
+        const cv::Scalar border_color = { 128, 128, 128 });
+
+    static void create_checkerboard_image(
+        cv::Mat& rimg,
+        const int k,
+        const int xrepeat,
+        const int yrepeat,
+        const grid_colors_t& rcolors = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN },
         const int kborder = 4,
         const cv::Scalar border_color = { 128, 128, 128 });
 

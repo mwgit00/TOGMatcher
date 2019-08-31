@@ -43,7 +43,9 @@ BGRLandmark::BGRLandmark()
 {
     init();
     cv::Mat xx;
-    create_landmark_image(xx, 256, { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN }, 16, { 32,64,128 });
+    cv::Mat xy;
+    create_landmark_image(xx, 256, PATTERN_0, 16, { 32,64,128 });
+    create_checkerboard_image(xy, 32, 3, 5);
 }
 
 
@@ -55,51 +57,25 @@ BGRLandmark::~BGRLandmark()
 
 
 
-void BGRLandmark::init(const int k, const grid_colors_t& r, const int mode)
+void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode)
 {
-	int xk;
-	int xkh;
-
-    this->mode = mode;
+    int fixk;
+    int fixkh;
 
     // set limits on size
-	xk = (k < 3) ? 3 : k;
-	xk = (k > 15) ? 15 : k;
-	xkh = xk / 2;
-
-    // set colors of each square in 2x2 grid, index is clockwise from upper left
-    cv::Scalar colors[4];
-    colors[0] = bgr_colors[static_cast<int>(r.c00)];
-    colors[1] = bgr_colors[static_cast<int>(r.c01)];
-    colors[2] = bgr_colors[static_cast<int>(r.c11)];
-    colors[3] = bgr_colors[static_cast<int>(r.c10)];
-
-    tmpl_bgr = cv::Mat::zeros({ xk, xk }, CV_8UC3);
-
-    // fill in 2x2 blocks (clockwise from upper left)
-    cv::rectangle(tmpl_bgr, { 0, 0, xkh, xkh }, colors[0], -1);
-    cv::rectangle(tmpl_bgr, { xkh + 1, 0, xkh, xkh }, colors[1], -1);
-    cv::rectangle(tmpl_bgr, { xkh, xkh, xk - 1, xk - 1 }, colors[2], -1);
-    cv::rectangle(tmpl_bgr, { 0, xkh + 1, xkh, xkh }, colors[3], -1);
+    fixk = (k < 3) ? 3 : k;
+    fixk = (k > 15) ? 15 : k;
+    fixkh = fixk / 2;
     
-    // fill in average at borders between blocks
-    cv::Scalar avg_c00_c10 = (colors[0] + colors[1]) / 2;
-    cv::Scalar avg_c10_c11 = (colors[1] + colors[2]) / 2;
-    cv::Scalar avg_c11_c01 = (colors[2] + colors[3]) / 2;
-    cv::Scalar avg_c01_c00 = (colors[3] + colors[0]) / 2;
-    cv::line(tmpl_bgr, { xkh, 0 }, { xkh, xkh }, avg_c00_c10);
-    cv::line(tmpl_bgr, { xkh, xkh }, { xk - 1, xkh }, avg_c10_c11);
-    cv::line(tmpl_bgr, { xkh, xkh }, { xkh, xk - 1 }, avg_c11_c01);
-    cv::line(tmpl_bgr, { 0, xkh }, { xkh, xkh }, avg_c01_c00);
+    // apply mode for template match
+    this->mode = mode;
 
-    // fill in average of all blocks at central point
-    cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
-    cv::line(tmpl_bgr, { xkh, xkh }, { xkh, xkh }, avg_all);
+    // generate template image
+    create_template_image(tmpl_bgr, fixk, rcolors);
 
-    tmpl_offset.width = xk / 2;
-    tmpl_offset.height = xk / 2;
-
-    cv::imwrite("foobgr.png", tmpl_bgr);
+    // stash offset for this template
+    tmpl_offset.width = fixkh;
+    tmpl_offset.height = fixkh;
 }
 
 
@@ -114,10 +90,54 @@ void BGRLandmark::perform_match(
 
 
 
+void BGRLandmark::create_template_image(cv::Mat& rimg, int k, const grid_colors_t& rcolors)
+{
+    int fixk;
+    int fixkh;
+
+    // set limits on size
+    fixk = (k < 3) ? 3 : k;
+    fixk = (k > 15) ? 15 : k;
+    fixkh = fixk / 2;
+
+    // set colors of each square in 2x2 grid, index is clockwise from upper left
+    cv::Scalar colors[4];
+    colors[0] = bgr_colors[static_cast<int>(rcolors.c00)];
+    colors[1] = bgr_colors[static_cast<int>(rcolors.c01)];
+    colors[2] = bgr_colors[static_cast<int>(rcolors.c11)];
+    colors[3] = bgr_colors[static_cast<int>(rcolors.c10)];
+
+    rimg = cv::Mat::zeros({ fixk, fixk }, CV_8UC3);
+
+    // fill in 2x2 blocks (clockwise from upper left)
+    cv::rectangle(rimg, { 0, 0, fixkh, fixkh }, colors[0], -1);
+    cv::rectangle(rimg, { fixkh + 1, 0, fixkh, fixkh }, colors[1], -1);
+    cv::rectangle(rimg, { fixkh, fixkh, fixk - 1, fixk - 1 }, colors[2], -1);
+    cv::rectangle(rimg, { 0, fixkh + 1, fixkh, fixkh }, colors[3], -1);
+
+    // fill in average at borders between blocks
+    cv::Scalar avg_c00_c10 = (colors[0] + colors[1]) / 2;
+    cv::Scalar avg_c10_c11 = (colors[1] + colors[2]) / 2;
+    cv::Scalar avg_c11_c01 = (colors[2] + colors[3]) / 2;
+    cv::Scalar avg_c01_c00 = (colors[3] + colors[0]) / 2;
+    cv::line(rimg, { fixkh, 0 }, { fixkh, fixkh }, avg_c00_c10);
+    cv::line(rimg, { fixkh, fixkh }, { fixk - 1, fixkh }, avg_c10_c11);
+    cv::line(rimg, { fixkh, fixkh }, { fixkh, fixk - 1 }, avg_c11_c01);
+    cv::line(rimg, { 0, fixkh }, { fixkh, fixkh }, avg_c01_c00);
+
+    // fill in average of all blocks at central point
+    cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
+    cv::line(rimg, { fixkh, fixkh }, { fixkh, fixkh }, avg_all);
+
+    cv::imwrite("foobgr.png", rimg);
+}
+
+
+
 void BGRLandmark::create_landmark_image(
     cv::Mat& rimg,
     const int k,
-    const grid_colors_t& r,
+    const grid_colors_t& rcolors,
     const int kborder,
     const cv::Scalar border_color)
 {
@@ -138,10 +158,10 @@ void BGRLandmark::create_landmark_image(
 
     // set colors of each square in 2x2 grid, index is clockwise from upper left
     cv::Scalar colors[4];
-    colors[0] = bgr_colors[static_cast<int>(r.c00)];
-    colors[1] = bgr_colors[static_cast<int>(r.c01)];
-    colors[2] = bgr_colors[static_cast<int>(r.c11)];
-    colors[3] = bgr_colors[static_cast<int>(r.c10)];
+    colors[0] = bgr_colors[static_cast<int>(rcolors.c00)];
+    colors[1] = bgr_colors[static_cast<int>(rcolors.c01)];
+    colors[2] = bgr_colors[static_cast<int>(rcolors.c11)];
+    colors[3] = bgr_colors[static_cast<int>(rcolors.c10)];
 
     // create image that will contain border and grid
     // fill it with border color
@@ -154,13 +174,70 @@ void BGRLandmark::create_landmark_image(
     cv::Rect roi = cv::Rect({ xkbfix, xkbfix }, img_grid.size());
 
     // fill in 2x2 blocks (clockwise from upper left)
-    cv::rectangle(img_grid, { 0, 0, xkh, xkh }, colors[0], -1);
-    cv::rectangle(img_grid, { xkh + 1, 0, xkh, xkh }, colors[1], -1);
+    cv::rectangle(img_grid, { 0, 0, xkh - 1, xkh - 1 }, colors[0], -1);
+    cv::rectangle(img_grid, { xkh, 0, xkh, xkh }, colors[1], -1);
     cv::rectangle(img_grid, { xkh, xkh, xk - 1, xk - 1 }, colors[2], -1);
-    cv::rectangle(img_grid, { 0, xkh + 1, xkh, xkh }, colors[3], -1);
+    cv::rectangle(img_grid, { 0, xkh, xkh, xkh }, colors[3], -1);
 
     // copy grid into image with border
     img_grid.copyTo(rimg(roi));
 
     cv::imwrite("foobgrx.png", rimg);
+}
+
+
+
+void BGRLandmark::create_checkerboard_image(
+    cv::Mat& rimg,
+    const int k,
+    const int xrepeat,
+    const int yrepeat,
+    const grid_colors_t& rcolors,
+    const int kborder,
+    const cv::Scalar border_color)
+{
+    int xkbx;
+    int xkby;
+    int xkbfix;
+    int xrfix;
+    int yrfix;
+
+    cv::Mat img_grid;
+    create_landmark_image(img_grid, k, rcolors, 0);
+
+    // set limits on border size
+    xkbfix = (kborder < 0) ? 0 : kborder;
+    xkbfix = (kborder > 16) ? 16 : kborder;
+
+    xrfix = (xrepeat < 2) ? 2 : xrepeat;
+    xrfix = (xrepeat > 8) ? 8 : xrepeat;
+    yrfix = (yrepeat < 2) ? 2 : yrepeat;
+    yrfix = (yrepeat > 8) ? 8 : yrepeat;
+
+    xkbx = (xkbfix * 2) + (img_grid.size().width * xrfix);
+    xkby = (xkbfix * 2) + (img_grid.size().height * yrfix);
+
+    // set colors of each square in 2x2 grid, index is clockwise from upper left
+    cv::Scalar colors[4];
+    colors[0] = bgr_colors[static_cast<int>(rcolors.c00)];
+    colors[1] = bgr_colors[static_cast<int>(rcolors.c01)];
+    colors[2] = bgr_colors[static_cast<int>(rcolors.c11)];
+    colors[3] = bgr_colors[static_cast<int>(rcolors.c10)];
+
+    // create image that will contain border and grid
+    // fill it with border color
+    rimg = cv::Mat::zeros({ xkbx, xkby }, CV_8UC3);
+    cv::rectangle(rimg, { 0, 0, xkbx, xkby }, border_color, -1);
+
+    // repeat the block pattern
+    for (int j = 0; j < yrfix; j++)
+    {
+        for (int i = 0; i < xrfix; i++)
+        {
+            cv::Rect roi = { (i * k) + xkbfix, (j * k) + xkbfix, k, k };
+            img_grid.copyTo(rimg(roi));
+        }
+    }
+
+    cv::imwrite("foobgrcb.png", rimg);
 }
