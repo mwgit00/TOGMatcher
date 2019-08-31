@@ -45,7 +45,11 @@ BGRLandmark::BGRLandmark()
     cv::Mat xx;
     cv::Mat xy;
     create_landmark_image(xx, 256, PATTERN_0, 16, { 32,64,128 });
+    cv::imwrite("foobgrlm.png", xx);
+
     create_checkerboard_image(xy, 32, 3, 5);
+    cv::imwrite("foobgrcb.png", xy);
+
 }
 
 
@@ -70,7 +74,7 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     // apply mode for template match
     this->mode = mode;
 
-    // generate template image
+    // stash the template image
     create_template_image(tmpl_bgr, fixk, rcolors);
 
     // stash offset for this template
@@ -86,6 +90,25 @@ void BGRLandmark::perform_match(
 {
     // works well with TM_SQDIFF_NORMED or TM_CCORR_NORMED
     matchTemplate(rsrc_bgr, tmpl_bgr, rtmatch, mode);
+}
+
+
+void BGRLandmark::perform_match_cb(
+    const cv::Mat& rsrc,
+    cv::Mat& rtmatch)
+{
+    const int k = 7;
+    cv::Mat t0;
+    cv::Mat t1;
+    cv::Mat tmatch0;
+    cv::Mat tmatch1;
+    create_template_image(t0, k, PATTERN_0);
+    create_template_image(t1, k, PATTERN_0N);
+    const int xmode = cv::TM_CCOEFF; // TM_CCOEFF, TM_CCORR_NORMED good
+    matchTemplate(rsrc, t0, tmatch0, xmode);
+    matchTemplate(rsrc, t1, tmatch1, xmode);
+    rtmatch = (tmatch0 - tmatch1);
+    rtmatch = abs(rtmatch);
 }
 
 
@@ -181,8 +204,6 @@ void BGRLandmark::create_landmark_image(
 
     // copy grid into image with border
     img_grid.copyTo(rimg(roi));
-
-    cv::imwrite("foobgrx.png", rimg);
 }
 
 
@@ -238,6 +259,4 @@ void BGRLandmark::create_checkerboard_image(
             img_grid.copyTo(rimg(roi));
         }
     }
-
-    cv::imwrite("foobgrcb.png", rimg);
 }

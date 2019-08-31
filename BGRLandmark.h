@@ -30,7 +30,7 @@ class BGRLandmark
 {
 public:
 
-    // names of colors with max or min BGR components
+    // names of colors with max and/or min BGR components
     enum class bgr_t : int
     {
         BLACK,
@@ -52,15 +52,20 @@ public:
         bgr_t c10;
     } grid_colors_t;
 
+    // a checkerboard will have one of these patterns at each corner
     const grid_colors_t PATTERN_0 = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN };
     const grid_colors_t PATTERN_1 = { bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK };
     const grid_colors_t PATTERN_2 = { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW };
     const grid_colors_t PATTERN_3 = { bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK };
+
+    // anti patterns for color patterns above
+    const grid_colors_t PATTERN_0N = { bgr_t::WHITE, bgr_t::BLUE, bgr_t::WHITE, bgr_t::RED };
 	
 
     BGRLandmark();
 	virtual ~BGRLandmark();
 
+    
     void init(
         const int k = 7,
         const grid_colors_t& rcolors = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN },
@@ -70,9 +75,17 @@ public:
 		const cv::Mat& rsrc,
 		cv::Mat& rtmatch);
 
+    void perform_match_cb(
+        const cv::Mat& rsrc,
+        cv::Mat& rtmatch);
+
     const cv::Size& get_template_offset(void) const { return tmpl_offset; }
 
-    static void create_template_image(cv::Mat& rimg, const int k, const grid_colors_t& rcolors);
+    
+    static void create_template_image(
+        cv::Mat& rimg,
+        const int k,
+        const grid_colors_t& rcolors);
 
     static void create_landmark_image(
         cv::Mat& rimg,

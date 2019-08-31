@@ -187,9 +187,9 @@ void loop2(void)
 	Mat img_channels[3];
 	Mat tmatch;
 
-    Mat img_cx = imread(".\\data\\colored_landmark_2x2_set.png", cv::IMREAD_COLOR);
-    Mat img_cx_bgr;
-    cvtColor(img_cx, img_cx_bgr, COLOR_RGB2BGR);
+    Mat img_cx_bgr = imread(".\\foobgrcb.png", cv::IMREAD_COLOR);
+    //Mat img_cx_bgr;
+    //cvtColor(img_cx, img_cx_bgr, COLOR_RGB2BGR);
 
 	BGRLandmark bwcf;
 	Ptr<CLAHE> pCLAHE = createCLAHE();
@@ -237,9 +237,9 @@ void loop2(void)
             static_cast<int>(capture_size.height * img_scale));
         resize(img, img_viewer, viewer_size);
 
-        if (img_viewer.rows > img_cx.rows)
+        if (img_viewer.rows > img_cx_bgr.rows)
         {
-            Rect roi = cv::Rect({ 0, 0 }, img_cx.size());
+            Rect roi = cv::Rect({ 0, 0 }, img_cx_bgr.size());
             img_cx_bgr.copyTo(img_viewer(roi));
         }
 
@@ -252,7 +252,7 @@ void loop2(void)
         }
 #endif
         // perform template match and locate maximum (best match)
-        bwcf.perform_match(img_viewer, tmatch);
+        bwcf.perform_match_cb(img_viewer, tmatch);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
 
         // apply the current output mode
