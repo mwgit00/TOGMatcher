@@ -115,6 +115,7 @@ void image_output(
     drawContours(rimg, rmatcher.get_contours(), -1, SCA_GREEN, 2, LINE_8, noArray(), INT_MAX, rptmax);
 #endif
     circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
+    circle(rimg, ptcenter, 15, SCA_GREEN, 5);
     
     // save each frame to a file if recording
     if (rknobs.get_record_enabled())
@@ -240,7 +241,7 @@ void loop2(void)
         if (img_viewer.rows > img_cx_bgr.rows)
         {
             Rect roi = cv::Rect({ 0, 0 }, img_cx_bgr.size());
-            img_cx_bgr.copyTo(img_viewer(roi));
+            //img_cx_bgr.copyTo(img_viewer(roi));
         }
 
 #if 0
@@ -252,7 +253,7 @@ void loop2(void)
         }
 #endif
         // perform template match and locate maximum (best match)
-        bwcf.perform_match_cb(img_viewer, tmatch);
+        bwcf.perform_match(img_viewer, tmatch);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
 
         // apply the current output mode

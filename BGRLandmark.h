@@ -58,9 +58,6 @@ public:
     const grid_colors_t PATTERN_2 = { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW };
     const grid_colors_t PATTERN_3 = { bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK };
 
-    // anti patterns for color patterns above
-    const grid_colors_t PATTERN_0N = { bgr_t::WHITE, bgr_t::BLUE, bgr_t::WHITE, bgr_t::RED };
-	
 
     BGRLandmark();
 	virtual ~BGRLandmark();
@@ -81,6 +78,8 @@ public:
 
     const cv::Size& get_template_offset(void) const { return tmpl_offset; }
 
+    static bgr_t invert_bgr(const bgr_t color);
+    static grid_colors_t invert_grid_colors(const grid_colors_t& rcolors);
     
     static void create_template_image(
         cv::Mat& rimg,
@@ -110,6 +109,7 @@ private:
     
     // the 2x2 grid BGR template
     cv::Mat tmpl_bgr;
+    cv::Mat tmpl_bgr_inv;
 
     // offset for centering template location
     cv::Size tmpl_offset;

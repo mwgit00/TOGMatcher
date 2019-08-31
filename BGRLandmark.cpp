@@ -44,7 +44,7 @@ BGRLandmark::BGRLandmark()
     init();
     cv::Mat xx;
     cv::Mat xy;
-    create_landmark_image(xx, 256, PATTERN_0, 16, { 32,64,128 });
+    create_landmark_image(xx, 256, PATTERN_0, 16);
     cv::imwrite("foobgrlm.png", xx);
 
     create_checkerboard_image(xy, 32, 3, 5);
@@ -74,8 +74,9 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     // apply mode for template match
     this->mode = mode;
 
-    // stash the template image
+    // stash the template images
     create_template_image(tmpl_bgr, fixk, rcolors);
+    create_template_image(tmpl_bgr_inv, fixk, invert_grid_colors(rcolors));
 
     // stash offset for this template
     tmpl_offset.width = fixkh;
@@ -89,7 +90,16 @@ void BGRLandmark::perform_match(
     cv::Mat& rtmatch)
 {
     // works well with TM_SQDIFF_NORMED or TM_CCORR_NORMED
-    matchTemplate(rsrc_bgr, tmpl_bgr, rtmatch, mode);
+//    matchTemplate(rsrc_bgr, tmpl_bgr, rtmatch, mode);
+
+    cv::Mat tmatch0;
+    cv::Mat tmatch1;
+    grid_colors_t PATTERN_0_INV = invert_grid_colors(PATTERN_0);
+    const int xmode = cv::TM_CCOEFF; // TM_CCOEFF, TM_CCORR_NORMED good
+    matchTemplate(rsrc_bgr, tmpl_bgr, tmatch0, xmode);
+    matchTemplate(rsrc_bgr, tmpl_bgr_inv, tmatch1, xmode);
+    rtmatch = (tmatch0 - tmatch1);
+    rtmatch = abs(rtmatch);
 }
 
 
@@ -102,13 +112,46 @@ void BGRLandmark::perform_match_cb(
     cv::Mat t1;
     cv::Mat tmatch0;
     cv::Mat tmatch1;
+    grid_colors_t PATTERN_0_INV = invert_grid_colors(PATTERN_0);
     create_template_image(t0, k, PATTERN_0);
-    create_template_image(t1, k, PATTERN_0N);
+    create_template_image(t1, k, PATTERN_0_INV);
     const int xmode = cv::TM_CCOEFF; // TM_CCOEFF, TM_CCORR_NORMED good
     matchTemplate(rsrc, t0, tmatch0, xmode);
     matchTemplate(rsrc, t1, tmatch1, xmode);
     rtmatch = (tmatch0 - tmatch1);
     rtmatch = abs(rtmatch);
+}
+
+
+
+BGRLandmark::bgr_t BGRLandmark::invert_bgr(const bgr_t color)
+{
+    bgr_t result = bgr_t::BLACK;
+    switch (color)
+    { 
+    case bgr_t::BLACK: result = bgr_t::WHITE; break;
+    case bgr_t::RED: result = bgr_t::CYAN; break;
+    case bgr_t::GREEN: result = bgr_t::MAGENTA; break;
+    case bgr_t::YELLOW: result = bgr_t::BLUE; break;
+    case bgr_t::BLUE: result = bgr_t::YELLOW; break;
+    case bgr_t::MAGENTA: result = bgr_t::GREEN; break;
+    case bgr_t::CYAN: result = bgr_t::RED; break;
+    case bgr_t::WHITE: result = bgr_t::BLACK; break;
+    default: break;
+    }
+    return result;
+}
+
+
+
+BGRLandmark::grid_colors_t BGRLandmark::invert_grid_colors(const grid_colors_t& rcolors)
+{
+    grid_colors_t result;
+    result.c00 = invert_bgr(rcolors.c00);
+    result.c01 = invert_bgr(rcolors.c01);
+    result.c11 = invert_bgr(rcolors.c11);
+    result.c10 = invert_bgr(rcolors.c10);
+    return result;
 }
 
 
