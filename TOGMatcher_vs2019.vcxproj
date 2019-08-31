@@ -116,14 +116,14 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="BWCornerFinder.cpp" />
+    <ClCompile Include="BGRLandmark.cpp" />
     <ClCompile Include="Knobs.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="TOGMatcher.cpp" />
     <ClCompile Include="util.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="BWCornerFinder.h" />
+    <ClInclude Include="BGRLandmark.h" />
     <ClInclude Include="Knobs.h" />
     <ClInclude Include="TOGMatcher.h" />
     <ClInclude Include="util.h" />

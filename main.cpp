@@ -29,7 +29,7 @@
 #include <sstream>
 #include <iomanip>
 
-#include "BWCornerFinder.h"
+#include "BGRLandmark.h"
 #include "TOGMatcher.h"
 #include "Knobs.h"
 #include "util.h"
@@ -187,7 +187,11 @@ void loop2(void)
 	Mat img_channels[3];
 	Mat tmatch;
 
-	BWCornerFinder bwcf;
+    Mat img_cx = imread(".\\data\\colored_landmark_2x2_set.png", cv::IMREAD_COLOR);
+    Mat img_cx_bgr;
+    cvtColor(img_cx, img_cx_bgr, COLOR_RGB2BGR);
+
+	BGRLandmark bwcf;
 	Ptr<CLAHE> pCLAHE = createCLAHE();
 
 	// need a 0 as argument
@@ -209,7 +213,14 @@ void loop2(void)
 	// and force template to be loaded at start of loop
 	theKnobs.handle_keypress('0');
 
-    bwcf.init(15);// theKnobs.get_ksize());
+    BGRLandmark::grid_colors_t bc =
+    {
+        BGRLandmark::bgr_t::BLACK,
+        BGRLandmark::bgr_t::YELLOW,
+        BGRLandmark::bgr_t::BLACK,
+        BGRLandmark::bgr_t::CYAN,
+    };
+    bwcf.init(7, bc);// theKnobs.get_ksize());
 
     // and the image processing loop is running...
     bool is_running = true;
@@ -226,37 +237,22 @@ void loop2(void)
             static_cast<int>(capture_size.height * img_scale));
         resize(img, img_viewer, viewer_size);
 
-        // apply the current channel setting
-        int nchan = theKnobs.get_channel();
-        if (nchan == Knobs::ALL_CHANNELS)
+        if (img_viewer.rows > img_cx.rows)
         {
-            // combine all channels into grayscale
-            cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
-        }
-        else
-        {
-            // select only one BGR channel
-            split(img_viewer, img_channels);
-            img_gray = img_channels[nchan];
+            Rect roi = cv::Rect({ 0, 0 }, img_cx.size());
+            img_cx_bgr.copyTo(img_viewer(roi));
         }
 
-        // apply the current histogram equalization setting
-        if (theKnobs.get_equ_hist_enabled())
-        {
-            double c = theKnobs.get_clip_limit();
-            pCLAHE->setClipLimit(c);
-            pCLAHE->apply(img_gray, img_gray);
-        }
-
+#if 0
         // apply the current blur setting
         int kblur = theKnobs.get_pre_blur();
         if (kblur >= 3)
         {
             GaussianBlur(img_gray, img_gray, { kblur, kblur }, 0, 0);
         }
-
+#endif
         // perform template match and locate maximum (best match)
-        bwcf.perform_match(img_gray, tmatch);
+        bwcf.perform_match(img_viewer, tmatch);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
 
         // apply the current output mode
@@ -268,7 +264,7 @@ void loop2(void)
                 // show the raw template match result
                 // it is shifted and placed on top of blank image of original input size
                 const Size& tmpl_offset = bwcf.get_template_offset();
-                Mat full_tmatch = Mat::zeros(img_gray.size(), CV_32F);
+                Mat full_tmatch = Mat::zeros(img_viewer.size(), CV_32F);
                 Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, tmatch.cols, tmatch.rows);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 tmatch.copyTo(full_tmatch(roi));
@@ -277,12 +273,11 @@ void loop2(void)
             }
             case Knobs::OUT_MASK:
             {
-                // display pre-processed gray input image
+                // display pre-processed input image
                 // show red overlay of any matches that exceed arbitrary threshold
                 Mat match_mask;
                 std::vector<std::vector<cv::Point>> contours;
                 const Size& tmpl_offset = bwcf.get_template_offset();
-                cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 match_mask = (tmatch > MATCH_DISPLAY_THRESHOLD);
                 findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);

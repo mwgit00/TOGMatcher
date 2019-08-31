@@ -27,7 +27,7 @@
     <ClCompile Include="util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="BWCornerFinder.cpp">
+    <ClCompile Include="BGRLandmark.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -41,7 +41,7 @@
     <ClInclude Include="util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BWCornerFinder.h">
+    <ClInclude Include="BGRLandmark.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
