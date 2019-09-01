@@ -24,8 +24,11 @@
 #include "BGRLandmark.h"
 
 
+#define RAIL_MIN(a,b)   {if(a<b){a=b;}}
+#define RAIL_MAX(a,b)   {if(a>b){a=b;}}
 
-const cv::Scalar bgr_colors[8] =
+
+const cv::Scalar BGRLandmark::bgr_colors[8] =
 {
     cv::Scalar(0, 0, 0),
     cv::Scalar(0, 0, 255),
@@ -38,18 +41,23 @@ const cv::Scalar bgr_colors[8] =
 };
 
 
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_0 = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_1 = { bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_2 = { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_3 = { bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK };
+
+
 
 BGRLandmark::BGRLandmark()
 {
     init();
     cv::Mat xx;
     cv::Mat xy;
-    create_landmark_image(xx, 256, PATTERN_0, 16);
+    create_landmark_image(xx, 2.0, 0.125);
     cv::imwrite("foobgrlm.png", xx);
 
-    create_checkerboard_image(xy, 32, 3, 5);
+    create_checkerboard_image(xy, 3, 5, 0.5, 0.25);
     cv::imwrite("foobgrcb.png", xy);
-
 }
 
 
@@ -66,17 +74,18 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     int fixk;
     int fixkh;
 
-    // set limits on size
+    // set limits on size and make it odd
     fixk = (k < 3) ? 3 : k;
     fixk = (k > 15) ? 15 : k;
+    fixk = ((fixk % 2) == 0) ? fixk + 1 : fixk;
     fixkh = fixk / 2;
     
     // apply mode for template match
+    // TM_CCOEFF seems like best all-around choice
     this->mode = mode;
 
-    // stash the template images
+    // stash the template image
     create_template_image(tmpl_bgr, fixk, rcolors);
-    create_template_image(tmpl_bgr_inv, fixk, invert_grid_colors(rcolors));
 
     // stash offset for this template
     tmpl_offset.width = fixkh;
@@ -89,17 +98,7 @@ void BGRLandmark::perform_match(
     const cv::Mat& rsrc_bgr,
     cv::Mat& rtmatch)
 {
-    // works well with TM_SQDIFF_NORMED or TM_CCORR_NORMED
-//    matchTemplate(rsrc_bgr, tmpl_bgr, rtmatch, mode);
-
-    cv::Mat tmatch0;
-    cv::Mat tmatch1;
-    grid_colors_t PATTERN_0_INV = invert_grid_colors(PATTERN_0);
-    const int xmode = cv::TM_CCOEFF; // TM_CCOEFF, TM_CCORR_NORMED good
-    matchTemplate(rsrc_bgr, tmpl_bgr, tmatch0, xmode);
-    matchTemplate(rsrc_bgr, tmpl_bgr_inv, tmatch1, xmode);
-    rtmatch = (tmatch0 - tmatch1);
-    rtmatch = abs(rtmatch);
+    matchTemplate(rsrc_bgr, tmpl_bgr, rtmatch, mode);
 }
 
 
@@ -202,25 +201,26 @@ void BGRLandmark::create_template_image(cv::Mat& rimg, int k, const grid_colors_
 
 void BGRLandmark::create_landmark_image(
     cv::Mat& rimg,
-    const int k,
+    const double dim_grid,
+    const double dim_border,
     const grid_colors_t& rcolors,
-    const int kborder,
-    const cv::Scalar border_color)
+    const cv::Scalar border_color,
+    const int dpi)
 {
-    int xk;
-    int xkh;
-    int xkb;
-    int xkbfix;
+    // set limits on 2x2 grid size (0.5 inch to 6.0 inch)
+    double dim_grid_fix = dim_grid;
+    RAIL_MIN(dim_grid_fix, 0.5);
+    RAIL_MAX(dim_grid_fix, 6.0);
 
-    // set limits on 2x2 grid size
-    xk = (k < 16) ? 16 : k;
-    xk = (k > 256) ? 256 : k;
-    xkh = xk / 2;
-    
-    // set limits on border size
-    xkbfix = (kborder < 0) ? 0 : kborder;
-    xkbfix = (kborder > 16) ? 16 : kborder;
-    xkb = xk + (xkbfix * 2);
+    // set limits on size of border (0 inches to 1 inch)
+    double dim_border_fix = dim_border;
+    RAIL_MIN(dim_border_fix, 0.0);
+    RAIL_MAX(dim_border_fix, 1.0);
+
+    const int kgrid = static_cast<int>(dim_grid_fix * dpi);
+    const int kborder = static_cast<int>(dim_border_fix * dpi);
+    const int kgridh = kgrid / 2;
+    const int kfull = kgrid + (kborder * 2);
 
     // set colors of each square in 2x2 grid, index is clockwise from upper left
     cv::Scalar colors[4];
@@ -231,19 +231,19 @@ void BGRLandmark::create_landmark_image(
 
     // create image that will contain border and grid
     // fill it with border color
-    rimg = cv::Mat::zeros({ xkb, xkb }, CV_8UC3);
-    cv::rectangle(rimg, { 0, 0, xkb, xkb }, border_color, -1);
+    rimg = cv::Mat::zeros({ kfull, kfull }, CV_8UC3);
+    cv::rectangle(rimg, { 0, 0, kfull, kfull }, border_color, -1);
 
     // create image with just the grid
-    cv::Mat img_grid = cv::Mat::zeros({ xk, xk }, CV_8UC3);
+    cv::Mat img_grid = cv::Mat::zeros({ kgrid, kgrid }, CV_8UC3);
 
-    cv::Rect roi = cv::Rect({ xkbfix, xkbfix }, img_grid.size());
+    cv::Rect roi = cv::Rect({ kborder, kborder }, img_grid.size());
 
     // fill in 2x2 blocks (clockwise from upper left)
-    cv::rectangle(img_grid, { 0, 0, xkh - 1, xkh - 1 }, colors[0], -1);
-    cv::rectangle(img_grid, { xkh, 0, xkh, xkh }, colors[1], -1);
-    cv::rectangle(img_grid, { xkh, xkh, xk - 1, xk - 1 }, colors[2], -1);
-    cv::rectangle(img_grid, { 0, xkh, xkh, xkh }, colors[3], -1);
+    cv::rectangle(img_grid, { 0, 0, kgridh - 1, kgridh - 1 }, colors[0], -1);
+    cv::rectangle(img_grid, { kgridh, 0, kgridh, kgridh }, colors[1], -1);
+    cv::rectangle(img_grid, { kgridh, kgridh, kgrid - 1, kgrid - 1 }, colors[2], -1);
+    cv::rectangle(img_grid, { 0, kgridh, kgridh, kgridh }, colors[3], -1);
 
     // copy grid into image with border
     img_grid.copyTo(rimg(roi));
@@ -253,33 +253,43 @@ void BGRLandmark::create_landmark_image(
 
 void BGRLandmark::create_checkerboard_image(
     cv::Mat& rimg,
-    const int k,
     const int xrepeat,
     const int yrepeat,
+    const double dim_grid,
+    const double dim_border,
     const grid_colors_t& rcolors,
-    const int kborder,
-    const cv::Scalar border_color)
+    const cv::Scalar border_color,
+    const int dpi)
 {
-    int xkbx;
-    int xkby;
-    int xkbfix;
+    // set limits on 2x2 grid size (0.5 inch to 2.0 inch)
+    double dim_grid_fix = dim_grid;
+    RAIL_MIN(dim_grid_fix, 0.5);
+    RAIL_MAX(dim_grid_fix, 2.0);
+
+    // set limits on size of border (0 inches to 1 inch)
+    double dim_border_fix = dim_border;
+    RAIL_MIN(dim_border_fix, 0.0);
+    RAIL_MAX(dim_border_fix, 1.0);
+
+    const int kgrid = static_cast<int>(dim_grid_fix * dpi);
+    const int kborder = static_cast<int>(dim_border_fix * dpi);
+
     int xrfix;
     int yrfix;
 
-    cv::Mat img_grid;
-    create_landmark_image(img_grid, k, rcolors, 0);
-
-    // set limits on border size
-    xkbfix = (kborder < 0) ? 0 : kborder;
-    xkbfix = (kborder > 16) ? 16 : kborder;
-
+    // set limits on repeat counts
     xrfix = (xrepeat < 2) ? 2 : xrepeat;
     xrfix = (xrepeat > 8) ? 8 : xrepeat;
     yrfix = (yrepeat < 2) ? 2 : yrepeat;
     yrfix = (yrepeat > 8) ? 8 : yrepeat;
 
-    xkbx = (xkbfix * 2) + (img_grid.size().width * xrfix);
-    xkby = (xkbfix * 2) + (img_grid.size().height * yrfix);
+    // create a 2x2 grid with no border
+    // this will be replicated in the checkerboard
+    cv::Mat img_grid;
+    create_landmark_image(img_grid, dim_grid_fix, 0.0, rcolors, { 0,0,0 }, dpi);
+
+    const int kbx = (kborder * 2) + (img_grid.size().width * xrfix);
+    const int kby = (kborder * 2) + (img_grid.size().height * yrfix);
 
     // set colors of each square in 2x2 grid, index is clockwise from upper left
     cv::Scalar colors[4];
@@ -290,15 +300,15 @@ void BGRLandmark::create_checkerboard_image(
 
     // create image that will contain border and grid
     // fill it with border color
-    rimg = cv::Mat::zeros({ xkbx, xkby }, CV_8UC3);
-    cv::rectangle(rimg, { 0, 0, xkbx, xkby }, border_color, -1);
+    rimg = cv::Mat::zeros({ kbx, kby }, CV_8UC3);
+    cv::rectangle(rimg, { 0, 0, kbx, kby }, border_color, -1);
 
     // repeat the block pattern
     for (int j = 0; j < yrfix; j++)
     {
         for (int i = 0; i < xrfix; i++)
         {
-            cv::Rect roi = { (i * k) + xkbfix, (j * k) + xkbfix, k, k };
+            cv::Rect roi = { (i * kgrid) + kborder, (j * kgrid) + kborder, kgrid, kgrid };
             img_grid.copyTo(rimg(roi));
         }
     }

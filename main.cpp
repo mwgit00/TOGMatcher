@@ -182,15 +182,16 @@ void loop2(void)
 	Size capture_size;
 	Point ptmax;
 
+    Mat img_cam;
 	Mat img;
 	Mat img_viewer;
 	Mat img_gray;
 	Mat img_channels[3];
 	Mat tmatch;
 
-    Mat img_cx_bgr = imread(".\\foobgrcb.png", cv::IMREAD_COLOR);
+    Mat img_cx_bgr;// = imread(".\\foobgrcb.png", cv::IMREAD_COLOR);
     //Mat img_cx_bgr;
-    //cvtColor(img_cx, img_cx_bgr, COLOR_RGB2BGR);
+    //cvtColor(img_cx_bgr, img_cx_bgr, COLOR_BGR2YUV);
 
 	BGRLandmark bwcf;
 	Ptr<CLAHE> pCLAHE = createCLAHE();
@@ -208,20 +209,14 @@ void loop2(void)
 
 	// camera is ready so grab a first image to determine its full size
 	vcap >> img;
+    //rotate(img_cam, img, ROTATE_90_COUNTERCLOCKWISE);
 	capture_size = img.size();
 
 	// use dummy operation to print initial Knobs settings message
 	// and force template to be loaded at start of loop
 	theKnobs.handle_keypress('0');
 
-    BGRLandmark::grid_colors_t bc =
-    {
-        BGRLandmark::bgr_t::BLACK,
-        BGRLandmark::bgr_t::YELLOW,
-        BGRLandmark::bgr_t::BLACK,
-        BGRLandmark::bgr_t::CYAN,
-    };
-    bwcf.init(7, bc);// theKnobs.get_ksize());
+    bwcf.init(5, bwcf.PATTERN_0);// theKnobs.get_ksize());
 
     // and the image processing loop is running...
     bool is_running = true;
@@ -230,6 +225,14 @@ void loop2(void)
     {
         // grab image
         vcap >> img;
+        //cvtColor(img, img, COLOR_BGR2YUV);
+        //int mmm = 32;
+        //int nnn = (255 / mmm) * mmm;
+        //float xxx = mmm;
+        //float yyy = (255.0 / static_cast<float>(nnn)) * xxx;
+        //img *= (1.0/xxx);
+        //img *= yyy;
+        //rotate(img_cam, img, ROTATE_90_COUNTERCLOCKWISE);
 
         // apply the current image scale setting
         double img_scale = theKnobs.get_img_scale();
