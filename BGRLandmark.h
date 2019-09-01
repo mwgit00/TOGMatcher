@@ -88,6 +88,8 @@ public:
     static bgr_t invert_bgr(const bgr_t color);
     static grid_colors_t invert_grid_colors(const grid_colors_t& rcolors);
     
+    
+    // creates a 2x2 BGR template of pixel dimension k
     static void create_template_image(
         cv::Mat& rimg,
         const int k,
@@ -112,6 +114,13 @@ public:
         const cv::Scalar border_color = { 128, 128, 128 },
         const int dpi = 96);
 
+    static void augment_landmark_image(
+        cv::Mat& rimg,
+        const double dim_border,
+        const double padfac,
+        const std::vector<bgr_t>& rvec,
+        const cv::Scalar border_color = { 128, 128, 128 },
+        const int dpi = 96);
 
 private:
 

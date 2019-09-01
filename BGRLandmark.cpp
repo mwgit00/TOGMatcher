@@ -53,8 +53,10 @@ BGRLandmark::BGRLandmark()
     init();
     cv::Mat xx;
     cv::Mat xy;
-    create_landmark_image(xx, 2.0, 0.125);
+    create_landmark_image(xx, 3.0, 0.25);
     cv::imwrite("foobgrlm.png", xx);
+    augment_landmark_image(xx, 0.25, 0.8, { bgr_t::GREEN, bgr_t::MAGENTA, bgr_t::WHITE });
+    cv::imwrite("foobgraug.png", xx);
 
     create_checkerboard_image(xy, 3, 5, 0.5, 0.25);
     cv::imwrite("foobgrcb.png", xy);
@@ -312,4 +314,65 @@ void BGRLandmark::create_checkerboard_image(
             img_grid.copyTo(rimg(roi));
         }
     }
+}
+
+
+
+void BGRLandmark::augment_landmark_image(
+    cv::Mat& rimg,
+    const double dim_border,
+    const double padfac,
+    const std::vector<BGRLandmark::bgr_t>& rvec,
+    const cv::Scalar border_color,
+    const int dpi)
+{
+    // set limits on number of dots
+    int num_dots = static_cast<int>(rvec.size());
+    if ((num_dots < 1) || (num_dots > 4))
+    {
+        ///////
+        return;
+        ///////
+    }
+
+    // set limits on size of border (0 inches to 1 inch)
+    double dim_border_fix = dim_border;
+    RAIL_MIN(dim_border_fix, 0.0);
+    RAIL_MAX(dim_border_fix, 1.0);
+
+    // set limits on radius padding factor
+    double padfac_fix = padfac;
+    RAIL_MAX(padfac_fix, 1.0);
+    RAIL_MIN(padfac_fix, 0.2);
+
+    // input is a landmark image with a border
+    const int kborder = static_cast<int>(dim_border_fix * dpi);
+    const int kdim = rimg.size().width;
+    const int kgrid = (kdim - (2 * kborder));
+    const int kstep = kgrid / num_dots;
+    
+    int krad = ((kgrid / static_cast<int>(num_dots)) / 2);
+    krad = static_cast<int>(padfac_fix * krad);
+
+    // make a new image that will hold landmark and colored dots
+    // there is additional border padding at the bottom
+    cv::Mat img;
+    img = cv::Mat::zeros({ kdim, kdim + kstep + kborder }, CV_8UC3);
+    cv::rectangle(img, { { 0, 0 }, img.size() }, border_color, -1);
+
+    // draw dots
+    int x = (kstep / 2) + kborder;
+    for (const auto& r : rvec)
+    {
+        cv::Point ctr = { x, kdim + (kstep / 2) };
+        cv::circle(img, ctr, krad, bgr_colors[static_cast<int>(r)], -1, cv::LINE_AA);
+        x += kstep;
+    }
+
+    // draw landmark into new image
+    cv::Rect roi = cv::Rect({ 0, 0 }, rimg.size());
+    rimg.copyTo(img(roi));
+
+    // assign new image to input image
+    rimg = img;
 }
