@@ -216,8 +216,6 @@ void loop2(void)
 	// and force template to be loaded at start of loop
 	theKnobs.handle_keypress('0');
 
-    bwcf.init(5, bwcf.PATTERN_0);// theKnobs.get_ksize());
-
     // and the image processing loop is running...
     bool is_running = true;
 
@@ -225,13 +223,6 @@ void loop2(void)
     {
         // grab image
         vcap >> img;
-        //cvtColor(img, img, COLOR_BGR2YUV);
-        //int mmm = 32;
-        //int nnn = (255 / mmm) * mmm;
-        //float xxx = mmm;
-        //float yyy = (255.0 / static_cast<float>(nnn)) * xxx;
-        //img *= (1.0/xxx);
-        //img *= yyy;
         //rotate(img_cam, img, ROTATE_90_COUNTERCLOCKWISE);
 
         // apply the current image scale setting
@@ -247,17 +238,11 @@ void loop2(void)
             //img_cx_bgr.copyTo(img_viewer(roi));
         }
 
-#if 0
-        // apply the current blur setting
-        int kblur = theKnobs.get_pre_blur();
-        if (kblur >= 3)
-        {
-            GaussianBlur(img_gray, img_gray, { kblur, kblur }, 0, 0);
-        }
-#endif
-        // perform template match and locate maximum (best match)
-        bwcf.perform_match(img_viewer, tmatch);
+        // look for landmarks
+        std::vector<std::vector<cv::Point>> qcontours;
+        bwcf.perform_match(img_viewer, tmatch, qcontours);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
+        ptmax = { 0,0 };
 
         // apply the current output mode
         // content varies but all final output images are BGR
@@ -280,12 +265,8 @@ void loop2(void)
                 // display pre-processed input image
                 // show red overlay of any matches that exceed arbitrary threshold
                 Mat match_mask;
-                std::vector<std::vector<cv::Point>> contours;
                 const Size& tmpl_offset = bwcf.get_template_offset();
-                normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
-                match_mask = (tmatch > MATCH_DISPLAY_THRESHOLD);
-                findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-                drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
+                drawContours(img_viewer, qcontours, -1, SCA_RED, 9, LINE_8, noArray(), INT_MAX, tmpl_offset);
                 break;
             }
             case Knobs::OUT_COLOR:

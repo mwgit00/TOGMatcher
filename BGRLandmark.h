@@ -44,7 +44,8 @@ public:
     };
 
     // there 8 colors with max/min BGR components
-    static const cv::Scalar bgr_colors[8];
+    static const cv::Scalar BGR_COLORS[8];
+    static const cv::Scalar BGR_BORDER;
 
 
     // codes for the color of each block in 2x2 grid (clockwise from upper left)
@@ -54,8 +55,6 @@ public:
         bgr_t c01;
         bgr_t c11;
         bgr_t c10;
-        zub() {}
-        zub(bgr_t a, bgr_t b, bgr_t c, bgr_t d) : c00(a), c01(b), c11(c), c10(d) {}
     } grid_colors_t;
 
     // a default checkerboard will have one of these patterns at each 2x2 corner
@@ -76,7 +75,8 @@ public:
 
 	void perform_match(
 		const cv::Mat& rsrc,
-		cv::Mat& rtmatch);
+		cv::Mat& rtmatch,
+        std::vector<std::vector<cv::Point>>& rcontours);
 
     void perform_match_cb(
         const cv::Mat& rsrc,
@@ -85,7 +85,10 @@ public:
     const cv::Size& get_template_offset(void) const { return tmpl_offset; }
 
     
+    // returns color index that is inverse of input color index
     static bgr_t invert_bgr(const bgr_t color);
+    
+    // inverts the color indexes for a grid
     static grid_colors_t invert_grid_colors(const grid_colors_t& rcolors);
     
     
@@ -96,14 +99,16 @@ public:
         const grid_colors_t& rcolors);
 
     
+    // creates printable 2x2 landmark image
     static void create_landmark_image(
         cv::Mat& rimg,
         const double dim_grid = 1.0,
         const double dim_border = 0.25,
         const grid_colors_t& rcolors = PATTERN_0,
-        const cv::Scalar border_color = { 128, 128, 128 },
+        const cv::Scalar border_color = BGR_BORDER,
         const int dpi = 96);
 
+    // creates printable checkerboard by repeating a 2x2 landmark pattern
     static void create_checkerboard_image(
         cv::Mat& rimg,
         const int xrepeat,
@@ -111,21 +116,27 @@ public:
         const double dim_grid = 2.0,
         const double dim_border = 0.25,
         const grid_colors_t& rcolors = PATTERN_0,
-        const cv::Scalar border_color = { 128, 128, 128 },
+        const cv::Scalar border_color = BGR_BORDER,
         const int dpi = 96);
 
+    // converts ID to BGR dots and puts dots at bottom of printable 2x2 landmark image
     static void augment_landmark_image(
         cv::Mat& rimg,
-        const double dim_border,
-        const double padfac,
-        const std::vector<bgr_t>& rvec,
-        const cv::Scalar border_color = { 128, 128, 128 },
+        const int id,
+        const int num_dots = 3,
+        const double dim_border = 0.25,
+        const double padfac = 0.75,
+        const cv::Scalar border_color = BGR_BORDER,
         const int dpi = 96);
+
 
 private:
 
     // mode for matchTemplate
     int mode;
+
+    // threshold for match consideration
+    double match_thr;
     
     // the 2x2 grid BGR template
     cv::Mat tmpl_bgr;

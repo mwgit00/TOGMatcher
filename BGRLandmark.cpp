@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <list>
 #include "opencv2/highgui.hpp"
 #include "BGRLandmark.h"
 
@@ -28,7 +29,7 @@
 #define RAIL_MAX(a,b)   {if(a>b){a=b;}}
 
 
-const cv::Scalar BGRLandmark::bgr_colors[8] =
+const cv::Scalar BGRLandmark::BGR_COLORS[8] =
 {
     cv::Scalar(0, 0, 0),
     cv::Scalar(0, 0, 255),
@@ -40,6 +41,7 @@ const cv::Scalar BGRLandmark::bgr_colors[8] =
     cv::Scalar(255, 255, 255),
 };
 
+const cv::Scalar BGRLandmark::BGR_BORDER = { 255, 255, 255 };
 
 const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_0 = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN };
 const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_1 = { bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK };
@@ -55,7 +57,7 @@ BGRLandmark::BGRLandmark()
     cv::Mat xy;
     create_landmark_image(xx, 3.0, 0.25);
     cv::imwrite("foobgrlm.png", xx);
-    augment_landmark_image(xx, 0.25, 0.8, { bgr_t::GREEN, bgr_t::MAGENTA, bgr_t::WHITE });
+    augment_landmark_image(xx, 0653); // octal
     cv::imwrite("foobgraug.png", xx);
 
     create_checkerboard_image(xy, 3, 5, 0.5, 0.25);
@@ -66,7 +68,7 @@ BGRLandmark::BGRLandmark()
 
 BGRLandmark::~BGRLandmark()
 {
-
+    // does nothing
 }
 
 
@@ -86,6 +88,8 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     // TM_CCOEFF seems like best all-around choice
     this->mode = mode;
 
+    match_thr = 0.75;
+
     // stash the template image
     create_template_image(tmpl_bgr, fixk, rcolors);
 
@@ -98,9 +102,17 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
 
 void BGRLandmark::perform_match(
     const cv::Mat& rsrc_bgr,
-    cv::Mat& rtmatch)
+    cv::Mat& rtmatch,
+    std::vector<std::vector<cv::Point>>& rcontours)
 {
     matchTemplate(rsrc_bgr, tmpl_bgr, rtmatch, mode);
+
+    double qmax;
+    std::vector<std::vector<cv::Point>> contours;
+
+    minMaxLoc(rtmatch, nullptr, &qmax, nullptr, nullptr);
+    cv::Mat match_masked = (rtmatch > (match_thr * qmax));
+    findContours(match_masked, rcontours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 }
 
 
@@ -130,15 +142,15 @@ BGRLandmark::bgr_t BGRLandmark::invert_bgr(const bgr_t color)
     bgr_t result = bgr_t::BLACK;
     switch (color)
     { 
-    case bgr_t::BLACK: result = bgr_t::WHITE; break;
-    case bgr_t::RED: result = bgr_t::CYAN; break;
-    case bgr_t::GREEN: result = bgr_t::MAGENTA; break;
-    case bgr_t::YELLOW: result = bgr_t::BLUE; break;
-    case bgr_t::BLUE: result = bgr_t::YELLOW; break;
-    case bgr_t::MAGENTA: result = bgr_t::GREEN; break;
-    case bgr_t::CYAN: result = bgr_t::RED; break;
-    case bgr_t::WHITE: result = bgr_t::BLACK; break;
-    default: break;
+        case bgr_t::BLACK: result = bgr_t::WHITE; break;
+        case bgr_t::RED: result = bgr_t::CYAN; break;
+        case bgr_t::GREEN: result = bgr_t::MAGENTA; break;
+        case bgr_t::YELLOW: result = bgr_t::BLUE; break;
+        case bgr_t::BLUE: result = bgr_t::YELLOW; break;
+        case bgr_t::MAGENTA: result = bgr_t::GREEN; break;
+        case bgr_t::CYAN: result = bgr_t::RED; break;
+        case bgr_t::WHITE: result = bgr_t::BLACK; break;
+        default: break;
     }
     return result;
 }
@@ -169,10 +181,10 @@ void BGRLandmark::create_template_image(cv::Mat& rimg, int k, const grid_colors_
 
     // set colors of each square in 2x2 grid, index is clockwise from upper left
     cv::Scalar colors[4];
-    colors[0] = bgr_colors[static_cast<int>(rcolors.c00)];
-    colors[1] = bgr_colors[static_cast<int>(rcolors.c01)];
-    colors[2] = bgr_colors[static_cast<int>(rcolors.c11)];
-    colors[3] = bgr_colors[static_cast<int>(rcolors.c10)];
+    colors[0] = BGR_COLORS[static_cast<int>(rcolors.c00)];
+    colors[1] = BGR_COLORS[static_cast<int>(rcolors.c01)];
+    colors[2] = BGR_COLORS[static_cast<int>(rcolors.c11)];
+    colors[3] = BGR_COLORS[static_cast<int>(rcolors.c10)];
 
     rimg = cv::Mat::zeros({ fixk, fixk }, CV_8UC3);
 
@@ -226,10 +238,10 @@ void BGRLandmark::create_landmark_image(
 
     // set colors of each square in 2x2 grid, index is clockwise from upper left
     cv::Scalar colors[4];
-    colors[0] = bgr_colors[static_cast<int>(rcolors.c00)];
-    colors[1] = bgr_colors[static_cast<int>(rcolors.c01)];
-    colors[2] = bgr_colors[static_cast<int>(rcolors.c11)];
-    colors[3] = bgr_colors[static_cast<int>(rcolors.c10)];
+    colors[0] = BGR_COLORS[static_cast<int>(rcolors.c00)];
+    colors[1] = BGR_COLORS[static_cast<int>(rcolors.c01)];
+    colors[2] = BGR_COLORS[static_cast<int>(rcolors.c11)];
+    colors[3] = BGR_COLORS[static_cast<int>(rcolors.c10)];
 
     // create image that will contain border and grid
     // fill it with border color
@@ -295,10 +307,10 @@ void BGRLandmark::create_checkerboard_image(
 
     // set colors of each square in 2x2 grid, index is clockwise from upper left
     cv::Scalar colors[4];
-    colors[0] = bgr_colors[static_cast<int>(rcolors.c00)];
-    colors[1] = bgr_colors[static_cast<int>(rcolors.c01)];
-    colors[2] = bgr_colors[static_cast<int>(rcolors.c11)];
-    colors[3] = bgr_colors[static_cast<int>(rcolors.c10)];
+    colors[0] = BGR_COLORS[static_cast<int>(rcolors.c00)];
+    colors[1] = BGR_COLORS[static_cast<int>(rcolors.c01)];
+    colors[2] = BGR_COLORS[static_cast<int>(rcolors.c11)];
+    colors[3] = BGR_COLORS[static_cast<int>(rcolors.c10)];
 
     // create image that will contain border and grid
     // fill it with border color
@@ -320,19 +332,29 @@ void BGRLandmark::create_checkerboard_image(
 
 void BGRLandmark::augment_landmark_image(
     cv::Mat& rimg,
+    const int id,
+    const int num_dots,
     const double dim_border,
     const double padfac,
-    const std::vector<BGRLandmark::bgr_t>& rvec,
     const cv::Scalar border_color,
     const int dpi)
 {
     // set limits on number of dots
-    int num_dots = static_cast<int>(rvec.size());
-    if ((num_dots < 1) || (num_dots > 4))
+    if ((num_dots < 1) || (num_dots > 7))
     {
         ///////
         return;
         ///////
+    }
+
+    // convert ID to octal digit array which maps to the 8 dot colors
+    std::list<int> vec_octal;
+    int k = num_dots;
+    int id_temp = id;
+    while (k--)
+    {
+        vec_octal.push_front(id_temp % 8);
+        id_temp /= 8;
     }
 
     // set limits on size of border (0 inches to 1 inch)
@@ -362,10 +384,10 @@ void BGRLandmark::augment_landmark_image(
 
     // draw dots
     int x = (kstep / 2) + kborder;
-    for (const auto& r : rvec)
+    for (const auto& r : vec_octal)
     {
         cv::Point ctr = { x, kdim + (kstep / 2) };
-        cv::circle(img, ctr, krad, bgr_colors[static_cast<int>(r)], -1, cv::LINE_AA);
+        cv::circle(img, ctr, krad, BGR_COLORS[r], -1, cv::LINE_AA);
         x += kstep;
     }
 
