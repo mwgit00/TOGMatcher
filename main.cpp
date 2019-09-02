@@ -242,7 +242,7 @@ void loop2(void)
         std::vector<std::vector<cv::Point>> qcontours;
         bwcf.perform_match(img_viewer, tmatch, qcontours);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
-        ptmax = { 0,0 };
+        ptmax = { 0,70 };
 
         // apply the current output mode
         // content varies but all final output images are BGR

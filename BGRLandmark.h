@@ -92,13 +92,6 @@ public:
     static grid_colors_t invert_grid_colors(const grid_colors_t& rcolors);
     
     
-    // creates a 2x2 BGR template of pixel dimension k
-    static void create_template_image(
-        cv::Mat& rimg,
-        const int k,
-        const grid_colors_t& rcolors);
-
-    
     // creates printable 2x2 landmark image
     static void create_landmark_image(
         cv::Mat& rimg,
@@ -131,12 +124,24 @@ public:
 
 
 private:
+    
+    // creates a 2x2 BGR template of pixel dimension k
+    static void create_template_image(
+        cv::Mat& rimg,
+        const int k,
+        const grid_colors_t& rcolors);
+
+
+private:
 
     // mode for matchTemplate
     int mode;
 
     // threshold for match consideration
     double match_thr;
+
+    // score when matching template against itself
+    double ideal_score;
     
     // the 2x2 grid BGR template
     cv::Mat tmpl_bgr;
