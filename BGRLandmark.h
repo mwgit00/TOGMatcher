@@ -73,9 +73,9 @@ public:
         const grid_colors_t& rcolors = PATTERN_0,
         const int mode = cv::TM_CCOEFF);
 
-	void perform_match(
-		const cv::Mat& rsrc,
-		cv::Mat& rtmatch,
+    void perform_match(
+        const cv::Mat& rsrc,
+        cv::Mat& rtmatch,
         std::vector<std::vector<cv::Point>>& rcontours);
 
     void perform_match_cb(

@@ -90,7 +90,7 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     // stash the template image
     create_template_image(tmpl_bgr, fixk, rcolors);
 
-    // generate ideal score
+    // match template against self to generate ideal score
     cv::Mat ideal_match;
     cv::matchTemplate(tmpl_bgr, tmpl_bgr, ideal_match, mode);
     cv::minMaxLoc(ideal_match, nullptr, &ideal_score, nullptr, nullptr);
@@ -110,6 +110,7 @@ void BGRLandmark::perform_match(
 {
     matchTemplate(rsrc_bgr, tmpl_bgr, rtmatch, mode);
     std::vector<std::vector<cv::Point>> contours;
+    //rtmatch *= -1;
     cv::Mat match_masked = (rtmatch > (match_thr * ideal_score));
     findContours(match_masked, rcontours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 }

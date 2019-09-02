@@ -47,6 +47,7 @@ using namespace cv;
 #define SCA_RED     (cv::Scalar(0,0,255))
 #define SCA_GREEN   (cv::Scalar(0,255,0))
 #define SCA_YELLOW  (cv::Scalar(0,255,255))
+#define SCA_BLUE    (cv::Scalar(255,0,0))
 
 
 const char * stitle = "TOGMatcher";
@@ -186,7 +187,6 @@ void loop2(void)
 	Mat img;
 	Mat img_viewer;
 	Mat img_gray;
-	Mat img_channels[3];
 	Mat tmatch;
 
     Mat img_cx_bgr;// = imread(".\\foobgrcb.png", cv::IMREAD_COLOR);
@@ -205,7 +205,6 @@ void loop2(void)
 		return;
 		///////
 	}
-
 
 	// camera is ready so grab a first image to determine its full size
 	vcap >> img;
@@ -250,6 +249,7 @@ void loop2(void)
         {
             case Knobs::OUT_RAW:
             {
+#if 1
                 // show the raw template match result
                 // it is shifted and placed on top of blank image of original input size
                 const Size& tmpl_offset = bwcf.get_template_offset();
@@ -258,6 +258,28 @@ void loop2(void)
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 tmatch.copyTo(full_tmatch(roi));
                 cvtColor(full_tmatch, img_viewer, COLOR_GRAY2BGR);
+#else
+                //cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
+                split(img_viewer, img_channels);
+                cv::Mat z[3];
+                const int blk = 3;
+                const int c = 0;
+                pCLAHE->setClipLimit(4);
+                pCLAHE->apply(img_channels[0], img_channels[0]);
+                pCLAHE->apply(img_channels[1], img_channels[1]);
+                pCLAHE->apply(img_channels[2], img_channels[2]);
+#if 0
+                adaptiveThreshold(
+                    img_channels[0], z[0], 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, blk, c);
+                adaptiveThreshold(
+                    img_channels[1], z[1], 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, blk, c);
+                adaptiveThreshold(
+                    img_channels[2], z[2], 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, blk, c);
+                merge(z, 3, img_viewer);
+#endif
+                merge(img_channels, 3, img_viewer);
+                //cvtColor(z, img_viewer, COLOR_GRAY2BGR);
+#endif
                 break;
             }
             case Knobs::OUT_MASK:
@@ -266,7 +288,14 @@ void loop2(void)
                 // show red overlay of any matches that exceed arbitrary threshold
                 Mat match_mask;
                 const Size& tmpl_offset = bwcf.get_template_offset();
-                drawContours(img_viewer, qcontours, -1, SCA_RED, 9, LINE_8, noArray(), INT_MAX, tmpl_offset);
+                drawContours(img_viewer, qcontours, -1, SCA_RED, 11, LINE_8, noArray(), INT_MAX, tmpl_offset);
+                for (auto& r : qcontours)
+                {
+                    if (r.size() > 1)
+                    {
+                        //std::cout << r.size() << std::endl;
+                    }
+                }
                 break;
             }
             case Knobs::OUT_COLOR:
@@ -282,7 +311,6 @@ void loop2(void)
 
         // handle keyboard events and end when ESC is pressed
         is_running = wait_and_check_keys(theKnobs);
-
     }
 
     // when everything is done, release the capture device and windows
