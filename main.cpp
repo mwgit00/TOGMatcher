@@ -56,6 +56,7 @@ int n_record_ctr = 0;
 
 const std::vector<T_file_info> vfiles =
 {
+    { 0.20, "bgr_lm.png"},
     { 0.00, "circle_b_on_w.png"},
     { 0.00, "bottle_20perc_top_b_on_w.png"},
     { 0.00, "bottle_20perc_curve_b_on_w.png"},
@@ -180,21 +181,24 @@ void loop2(void)
 	int op_id;
 
 	double qmax;
+    Point ptmax;
 	Size capture_size;
-	Point ptmax;
 
-    Mat img_cam;
 	Mat img;
 	Mat img_viewer;
 	Mat img_gray;
-	Mat tmatch;
+	Mat cmatch;
+    Mat gmatch;
 
     Mat img_cx_bgr;// = imread(".\\foobgrcb.png", cv::IMREAD_COLOR);
     //Mat img_cx_bgr;
     //cvtColor(img_cx_bgr, img_cx_bgr, COLOR_BGR2YUV);
 
-	BGRLandmark bwcf;
+	BGRLandmark bgrm;
+    TOGMatcher togm;
 	Ptr<CLAHE> pCLAHE = createCLAHE();
+
+    togm.create_template_from_file(".\\data\\bgr_lm.png", 3, 0.2);
 
 	// need a 0 as argument
 	VideoCapture vcap(0);
@@ -208,7 +212,6 @@ void loop2(void)
 
 	// camera is ready so grab a first image to determine its full size
 	vcap >> img;
-    //rotate(img_cam, img, ROTATE_90_COUNTERCLOCKWISE);
 	capture_size = img.size();
 
 	// use dummy operation to print initial Knobs settings message
@@ -222,7 +225,6 @@ void loop2(void)
     {
         // grab image
         vcap >> img;
-        //rotate(img_cam, img, ROTATE_90_COUNTERCLOCKWISE);
 
         // apply the current image scale setting
         double img_scale = theKnobs.get_img_scale();
@@ -237,49 +239,44 @@ void loop2(void)
             //img_cx_bgr.copyTo(img_viewer(roi));
         }
 
-        // look for landmarks
+        // look for landmarks by shape in gray image
+        //cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
+        //togm.perform_match(img_gray, gmatch, false, 3);
+
+        // look for landmarks by color
         std::vector<std::vector<cv::Point>> qcontours;
-        bwcf.perform_match(img_viewer, tmatch, qcontours);
-        minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
-        ptmax = { 0,70 };
+        std::vector<cv::Point> qpts;
+        bgrm.perform_match(img_viewer, cmatch, qcontours, qpts, &qmax, &ptmax);
+        bgrm.check_grid_hues(img_viewer, ptmax);
 
         // apply the current output mode
         // content varies but all final output images are BGR
         switch (theKnobs.get_output_mode())
         {
-            case Knobs::OUT_RAW:
+            case Knobs::OUT_AUX:
+#if 0
             {
-#if 1
                 // show the raw template match result
                 // it is shifted and placed on top of blank image of original input size
-                const Size& tmpl_offset = bwcf.get_template_offset();
+                const Size& tmpl_offset = togm.get_template_offset();
                 Mat full_tmatch = Mat::zeros(img_viewer.size(), CV_32F);
-                Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, tmatch.cols, tmatch.rows);
-                normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
-                tmatch.copyTo(full_tmatch(roi));
+                Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, gmatch.cols, gmatch.rows);
+                normalize(gmatch, gmatch, 0, 1, cv::NORM_MINMAX);
+                gmatch.copyTo(full_tmatch(roi));
                 cvtColor(full_tmatch, img_viewer, COLOR_GRAY2BGR);
-#else
-                //cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
-                split(img_viewer, img_channels);
-                cv::Mat z[3];
-                const int blk = 3;
-                const int c = 0;
-                pCLAHE->setClipLimit(4);
-                pCLAHE->apply(img_channels[0], img_channels[0]);
-                pCLAHE->apply(img_channels[1], img_channels[1]);
-                pCLAHE->apply(img_channels[2], img_channels[2]);
-#if 0
-                adaptiveThreshold(
-                    img_channels[0], z[0], 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, blk, c);
-                adaptiveThreshold(
-                    img_channels[1], z[1], 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, blk, c);
-                adaptiveThreshold(
-                    img_channels[2], z[2], 255, cv::ADAPTIVE_THRESH_MEAN_C, cv::THRESH_BINARY, blk, c);
-                merge(z, 3, img_viewer);
+                break;
+            }
 #endif
-                merge(img_channels, 3, img_viewer);
-                //cvtColor(z, img_viewer, COLOR_GRAY2BGR);
-#endif
+            case Knobs::OUT_RAW:
+            {
+                // show the raw template match result
+                // it is shifted and placed on top of blank image of original input size
+                const Size& tmpl_offset = bgrm.get_template_offset();
+                Mat full_tmatch = Mat::zeros(img_viewer.size(), CV_32F);
+                Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, cmatch.cols, cmatch.rows);
+                normalize(cmatch, cmatch, 0, 1, cv::NORM_MINMAX);
+                cmatch.copyTo(full_tmatch(roi));
+                cvtColor(full_tmatch, img_viewer, COLOR_GRAY2BGR);
                 break;
             }
             case Knobs::OUT_MASK:
@@ -287,7 +284,7 @@ void loop2(void)
                 // display pre-processed input image
                 // show red overlay of any matches that exceed arbitrary threshold
                 Mat match_mask;
-                const Size& tmpl_offset = bwcf.get_template_offset();
+                const Size& tmpl_offset = bgrm.get_template_offset();
                 drawContours(img_viewer, qcontours, -1, SCA_RED, 11, LINE_8, noArray(), INT_MAX, tmpl_offset);
                 for (auto& r : qcontours)
                 {
@@ -307,7 +304,7 @@ void loop2(void)
         }
 
         // always show best match contour and target dot on BGR image
-        image_output(img_viewer, qmax, ptmax, theKnobs, bwcf.get_template_offset());
+        image_output(img_viewer, qmax, ptmax, theKnobs, bgrm.get_template_offset());
 
         // handle keyboard events and end when ESC is pressed
         is_running = wait_and_check_keys(theKnobs);

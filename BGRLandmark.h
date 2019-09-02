@@ -44,6 +44,7 @@ public:
     };
 
     // there 8 colors with max/min BGR components
+    static const cv::Scalar BGR_TO_HSL[8];
     static const cv::Scalar BGR_COLORS[8];
     static const cv::Scalar BGR_BORDER;
 
@@ -69,20 +70,25 @@ public:
 
     
     void init(
-        const int k = 5,
+        const int k = 7,
         const grid_colors_t& rcolors = PATTERN_0,
         const int mode = cv::TM_CCOEFF);
 
     void perform_match(
         const cv::Mat& rsrc,
         cv::Mat& rtmatch,
-        std::vector<std::vector<cv::Point>>& rcontours);
+        std::vector<std::vector<cv::Point>>& rcontours,
+        std::vector<cv::Point>& rpts,
+        double * pmax = nullptr,
+        cv::Point * ppt = nullptr);
 
     void perform_match_cb(
         const cv::Mat& rsrc,
         cv::Mat& rtmatch);
 
     const cv::Size& get_template_offset(void) const { return tmpl_offset; }
+
+    double check_grid_hues(cv::Mat& rimg, const cv::Point& rpt) const;
 
     
     // returns color index that is inverse of input color index
@@ -136,6 +142,9 @@ private:
 
     // mode for matchTemplate
     int mode;
+
+    // pattern for the 2x2 grid
+    grid_colors_t pattern;
 
     // threshold for match consideration
     double match_thr;

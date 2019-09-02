@@ -29,6 +29,19 @@
 #define RAIL_MAX(a,b)   {if(a>b){a=b;}}
 
 
+const cv::Scalar BGRLandmark::BGR_TO_HSL[8] =
+{
+    cv::Scalar(0, 0, 0),
+    cv::Scalar(0, 0, 255),
+    cv::Scalar(0, 255, 0),
+    cv::Scalar(0, 255, 255),
+    cv::Scalar(255, 0, 0),
+    cv::Scalar(255, 0, 255),
+    cv::Scalar(255, 255, 0),
+    cv::Scalar(255, 255, 255),
+};
+
+
 const cv::Scalar BGRLandmark::BGR_COLORS[8] =
 {
     cv::Scalar(0, 0, 0),
@@ -40,6 +53,20 @@ const cv::Scalar BGRLandmark::BGR_COLORS[8] =
     cv::Scalar(255, 255, 0),
     cv::Scalar(255, 255, 255),
 };
+
+#if 0
+const ing BGRLandmark::BGR_COMPARE[8][3] =
+{
+    {0,0,0},
+    {0,0,0},
+    {0,0,0},
+    {0,0,0},
+    {0,0,0},
+    {0,0,0},
+    {0,0,0},
+    {0,0,0},
+};
+#endif
 
 const cv::Scalar BGRLandmark::BGR_BORDER = { 128, 128, 128 };
 
@@ -55,9 +82,9 @@ BGRLandmark::BGRLandmark()
     init();
     cv::Mat xx;
     cv::Mat xy;
-    create_landmark_image(xx, 3.0, 0.25);
+    create_landmark_image(xx, 3.0, 0.25, PATTERN_0, { 255,255,255 });
     cv::imwrite("foobgrlm.png", xx);
-    augment_landmark_image(xx, 0653); // octal
+    augment_landmark_image(xx, 0245, 3, 0.25, 0.75, { 255,255,255 }); // octal
     cv::imwrite("foobgraug.png", xx);
 
     create_checkerboard_image(xy, 3, 5, 0.5, 0.25);
@@ -79,6 +106,9 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     int fixk = ((k / 2) * 2) + 1;
     RAIL_MIN(fixk, 3);
     RAIL_MAX(fixk, 15);
+    
+    // stash the color pattern
+    pattern = rcolors;
     
     // apply mode for template match
     // TM_CCOEFF seems like best all-around choice
@@ -106,13 +136,34 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
 void BGRLandmark::perform_match(
     const cv::Mat& rsrc_bgr,
     cv::Mat& rtmatch,
-    std::vector<std::vector<cv::Point>>& rcontours)
+    std::vector<std::vector<cv::Point>>& rcontours,
+    std::vector<cv::Point>& rpts,
+    double * pmax,
+    cv::Point * ppt)
 {
     matchTemplate(rsrc_bgr, tmpl_bgr, rtmatch, mode);
     std::vector<std::vector<cv::Point>> contours;
-    //rtmatch *= -1;
     cv::Mat match_masked = (rtmatch > (match_thr * ideal_score));
+
+    // localize each landmark
     findContours(match_masked, rcontours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+    for (const auto& r : rcontours)
+    {
+        cv::Moments mm = cv::moments(r, true);
+        if (mm.m00 > 0.0)
+        {
+            rpts.push_back(cv::Point(mm.m01 / mm.m00, mm.m10 / mm.m00));
+        }
+    }
+
+    if (pmax != nullptr)
+    {
+        cv::minMaxLoc(rtmatch, nullptr, pmax, nullptr, ppt);
+        if (ideal_score > 0.0)
+        {
+            *pmax = *pmax / ideal_score;
+        }
+    }
 }
 
 
@@ -136,6 +187,50 @@ void BGRLandmark::perform_match_cb(
 }
 
 
+double BGRLandmark::check_grid_hues(cv::Mat& rimg, const cv::Point& rpt) const
+{
+    cv::Scalar sg[4] = { 0 };
+
+    const int koffs = 7;
+    const int ksize = koffs * 2 + 1;
+
+    // get region of interest around target point
+    const cv::Point roi_pt = { rpt.x - koffs + tmpl_offset.width, rpt.y - koffs + tmpl_offset.height };
+    const cv::Size roi_sz = { ksize, ksize };
+    const cv::Rect roi = cv::Rect(roi_pt, roi_sz);
+
+    // extract hue image from region of interest
+    cv::Mat img_hue;
+    cv::Mat img_roi(rimg(roi));
+    cv::cvtColor(img_roi, img_hue, cv::COLOR_BGR2HLS_FULL);
+    //cv::imwrite("crap.png", img_roi);
+
+    // get average hues along diagonals
+    const int hue_sample_ct = 3;
+    const int offset_from_center = 3;
+    for (int i = offset_from_center; i < offset_from_center + hue_sample_ct; i++)
+    {
+        sg[0] += cv::Scalar(img_hue.at<cv::Vec3b>({ koffs - i, koffs - i }));
+        sg[1] += cv::Scalar(img_hue.at<cv::Vec3b>({ koffs + i, koffs - i }));
+        sg[2] += cv::Scalar(img_hue.at<cv::Vec3b>({ koffs + i, koffs + i }));
+        sg[3] += cv::Scalar(img_hue.at<cv::Vec3b>({ koffs - i, koffs + i }));
+    }
+
+    double scale = 1.0 / static_cast<double>(hue_sample_ct);
+    sg[0] *= scale;
+    sg[1] *= scale;
+    sg[2] *= scale;
+    sg[3] *= scale;
+
+    //double a = bgr_compare(sg[1], pattern.c00);
+    
+    return 0;
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+// CLASS STATIC FUNCTIONS
 
 BGRLandmark::bgr_t BGRLandmark::invert_bgr(const bgr_t color)
 {

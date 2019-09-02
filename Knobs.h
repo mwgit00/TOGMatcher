@@ -39,6 +39,7 @@ public:
         OUT_RAW = 0,
         OUT_MASK = 1,
         OUT_COLOR = 2,
+        OUT_AUX = 3,
     };
 
     enum

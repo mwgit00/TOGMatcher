@@ -27,16 +27,16 @@
 
 Knobs::Knobs() :
     is_op_required(false),
-    is_equ_hist_enabled(true),
-    is_mask_enabled(true),
+    is_equ_hist_enabled(false),
+    is_mask_enabled(false),
     is_record_enabled(false),
-    kpreblur(7),
+    kpreblur(1),
     kcliplimit(4),
     nchannel(Knobs::ALL_CHANNELS),
     noutmode(Knobs::OUT_COLOR),
     op_id(Knobs::OP_NONE),
-    nimgscale(3),
-    nksize(4),
+    nimgscale(6),
+    nksize(1),
     vimgscale({ 0.25, 0.325, 0.4, 0.5, 0.625, 0.75, 1.0 }),
     vksize({ -1, 1, 3, 5, 7})
 {
@@ -94,6 +94,11 @@ void Knobs::handle_keypress(const char ckey)
         {
             // convert to channel code 0,1,2,3
             set_channel(ckey - '1');
+            break;
+        }
+        case '7':
+        {
+            set_output_mode(Knobs::OUT_AUX);
             break;
         }
         case '8':
@@ -202,7 +207,7 @@ void Knobs::handle_keypress(const char ckey)
     if (is_valid && !is_op_required)
     {
         const std::vector<std::string> srgb({ "Blue ", "Green", "Red  ", "Gray " });
-        const std::vector<std::string> sout({ "Raw  ", "Mask ", "Color" });
+        const std::vector<std::string> sout({ "Raw  ", "Mask ", "Color", "Aux" });
         std::cout << "Equ=" << is_equ_hist_enabled;
         std::cout << "  Mask=" << is_mask_enabled;
         std::cout << "  Blur=" << kpreblur;
