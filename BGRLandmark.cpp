@@ -111,8 +111,8 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     // TM_CCOEFF seems like best all-around choice for the BGR match
     this->mode = mode;
 
-    // TBD -- add parameter for threshold
-    match_thr = 0.25;
+    // TODO -- add parameter for threshold
+    match_thr = 0.20;
 
     // create the BGR template
     create_template_image(tmpl_bgr, fixk, rcolors);
@@ -123,6 +123,21 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     cv::cvtColor(tmpl_bgr, img_hls, cv::COLOR_BGR2HLS);
     split(img_hls, img_channels);
     tmpl_hue = img_channels[0];
+
+    // create a diagonal mask for checking hues
+    tmpl_hue_mask = cv::Mat::zeros(tmpl_hue.size(), CV_8UC1);
+    const int khalf = tmpl_bgr.size().width / 2;
+    const int hue_sample_ct = 3;
+    const int offset_from_center = 3;
+    for (int i = 2; i <= khalf; i++)
+    {
+        // TODO -- use grid color info
+        //img_mask.at<unsigned char>({ koffs - i, koffs - i }) = 255;
+        tmpl_hue_mask.at<unsigned char>({ khalf + i, khalf - i }) = 255;
+        //img_mask.at<unsigned char>({ koffs + i, koffs + i }) = 255;
+        tmpl_hue_mask.at<unsigned char>({ khalf - i, khalf + i }) = 255;
+    }
+    cv::imwrite("crapm.png", tmpl_hue_mask);
 
     // match BGR template against self to generate ideal score
     cv::Mat ideal_match;
@@ -154,9 +169,21 @@ void BGRLandmark::perform_match(
     for (const auto& r : rcontours)
     {
         cv::Moments mm = cv::moments(r, true);
+
+        // contour could be a single point or have area 0
+        cv::Point pt = r[0];
         if (mm.m00 > 0.0)
         {
-            rpts.push_back(cv::Point(mm.m01 / mm.m00, mm.m10 / mm.m00));
+            pt = cv::Point((mm.m10 / mm.m00), (mm.m01 / mm.m00));
+        }
+
+        // then apply template offset
+        //pt = { pt.x + tmpl_offset.width, pt.y + tmpl_offset.height };
+
+        double f = check_grid_hues(rsrc_bgr, pt);
+        if (f > 0.98)
+        {
+            rpts.push_back(pt);
         }
     }
 
@@ -191,17 +218,14 @@ void BGRLandmark::perform_match_cb(
 }
 
 
-double BGRLandmark::check_grid_hues(cv::Mat& rimg, const cv::Point& rpt) const
+double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) const
 {
     double result = 0.0;
-    const int kcenter = tmpl_bgr.size().width / 2;
-    const int ksize = kcenter * 2 + 1;
 
     // get region of interest around target point
-    // template offset is already applied since match has been performed
-    const cv::Size roi_sz = { ksize, ksize };
-    const cv::Rect roi = cv::Rect(rpt, roi_sz);
-
+    // match has been done and template offset has already been applied so no need for it here
+    const cv::Rect roi = cv::Rect(rpt, tmpl_bgr.size());
+    
     // extract image from region of interest
     // then convert and extract hue channel
     cv::Mat img_hls;
@@ -211,22 +235,10 @@ double BGRLandmark::check_grid_hues(cv::Mat& rimg, const cv::Point& rpt) const
     split(img_hls, img_channels);
     
     cv::imwrite("crap.png", img_roi);
-    cv::Mat img_mask = cv::Mat::zeros(tmpl_bgr.size(), CV_8UC1);
 
-    // create an "X" mask for checking hues
-    const int hue_sample_ct = 3;
-    const int offset_from_center = 3;
-    for (int i = 2; i < 5; i++)
-    {
-        //img_mask.at<unsigned char>({ koffs - i, koffs - i }) = 255;
-        img_mask.at<unsigned char>({ kcenter + i, kcenter - i }) = 255;
-        //img_mask.at<unsigned char>({ koffs + i, koffs + i }) = 255;
-        img_mask.at<unsigned char>({ kcenter - i, kcenter + i }) = 255;
-    }
-    imwrite("crapm.png", img_mask);
-    
+    // match hues in the non-black-white squares using masked template
     cv::Mat cmatch;
-    cv::matchTemplate(img_channels[0], tmpl_hue, cmatch, cv::TM_CCORR_NORMED, img_mask);
+    cv::matchTemplate(img_channels[0], tmpl_hue, cmatch, cv::TM_CCORR_NORMED, tmpl_hue_mask);
     cv::minMaxLoc(cmatch, nullptr, &result, nullptr, nullptr);
     return result;
 }

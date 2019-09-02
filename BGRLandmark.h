@@ -89,7 +89,7 @@ public:
 
     const cv::Size& get_template_offset(void) const { return tmpl_offset; }
 
-    double check_grid_hues(cv::Mat& rimg, const cv::Point& rpt) const;
+    double check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) const;
 
     
     // returns color index that is inverse of input color index
@@ -156,8 +156,9 @@ private:
     // the 2x2 grid BGR template
     cv::Mat tmpl_bgr;
 
-    // the 2x2 grid hue template
+    // the 2x2 grid hue template and mask
     cv::Mat tmpl_hue;
+    cv::Mat tmpl_hue_mask;
 
     // offset for centering template location
     cv::Size tmpl_offset;

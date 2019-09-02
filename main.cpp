@@ -117,7 +117,7 @@ void image_output(
     drawContours(rimg, rmatcher.get_contours(), -1, SCA_GREEN, 2, LINE_8, noArray(), INT_MAX, rptmax);
 #endif
     circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
-    circle(rimg, ptcenter, 15, SCA_GREEN, 5);
+    circle(rimg, ptcenter, 15, SCA_GREEN, 2);
     
     // save each frame to a file if recording
     if (rknobs.get_record_enabled())
@@ -247,26 +247,21 @@ void loop2(void)
         std::vector<std::vector<cv::Point>> qcontours;
         std::vector<cv::Point> qpts;
         bgrm.perform_match(img_viewer, cmatch, qcontours, qpts, &qmax, &ptmax);
-        bgrm.check_grid_hues(img_viewer, ptmax);
 
         // apply the current output mode
         // content varies but all final output images are BGR
         switch (theKnobs.get_output_mode())
         {
             case Knobs::OUT_AUX:
-#if 0
             {
                 // show the raw template match result
                 // it is shifted and placed on top of blank image of original input size
-                const Size& tmpl_offset = togm.get_template_offset();
-                Mat full_tmatch = Mat::zeros(img_viewer.size(), CV_32F);
-                Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, gmatch.cols, gmatch.rows);
-                normalize(gmatch, gmatch, 0, 1, cv::NORM_MINMAX);
-                gmatch.copyTo(full_tmatch(roi));
-                cvtColor(full_tmatch, img_viewer, COLOR_GRAY2BGR);
+                for (const auto& r : qpts)
+                {
+                    circle(img_viewer, r, 7, SCA_RED, 1);
+                }
                 break;
             }
-#endif
             case Knobs::OUT_RAW:
             {
                 // show the raw template match result
