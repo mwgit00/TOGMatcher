@@ -29,19 +29,6 @@
 #define RAIL_MAX(a,b)   {if(a>b){a=b;}}
 
 
-const cv::Scalar BGRLandmark::BGR_TO_HSL[8] =
-{
-    cv::Scalar(0, 0, 0),
-    cv::Scalar(0, 0, 255),
-    cv::Scalar(0, 255, 0),
-    cv::Scalar(0, 255, 255),
-    cv::Scalar(255, 0, 0),
-    cv::Scalar(255, 0, 255),
-    cv::Scalar(255, 255, 0),
-    cv::Scalar(255, 255, 255),
-};
-
-
 const cv::Scalar BGRLandmark::BGR_COLORS[8] =
 {
     cv::Scalar(0, 0, 0),
@@ -54,19 +41,29 @@ const cv::Scalar BGRLandmark::BGR_COLORS[8] =
     cv::Scalar(255, 255, 255),
 };
 
-#if 0
-const ing BGRLandmark::BGR_COMPARE[8][3] =
+const cv::Scalar BGRLandmark::BGR_TO_HLS[8] =
 {
-    {0,0,0},
-    {0,0,0},
-    {0,0,0},
-    {0,0,0},
-    {0,0,0},
-    {0,0,0},
-    {0,0,0},
-    {0,0,0},
+    cv::Scalar(0, 0, 0),
+    cv::Scalar(0, 128, 255),
+    cv::Scalar(60, 128, 255),
+    cv::Scalar(30, 128, 255),
+    cv::Scalar(120, 128, 255),
+    cv::Scalar(150, 128, 255),
+    cv::Scalar(90, 128, 255),
+    cv::Scalar(0, 255, 0),
 };
-#endif
+
+const cv::Scalar BGRLandmark::BGR_TO_HSV[8] =
+{
+    cv::Scalar(0, 0, 0),
+    cv::Scalar(0, 255, 255),
+    cv::Scalar(60, 255, 255),
+    cv::Scalar(30, 255, 255),
+    cv::Scalar(120, 255, 255),
+    cv::Scalar(150, 255, 255),
+    cv::Scalar(90, 255, 255),
+    cv::Scalar(0, 0, 255),
+};
 
 const cv::Scalar BGRLandmark::BGR_BORDER = { 128, 128, 128 };
 
@@ -111,16 +108,23 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     pattern = rcolors;
     
     // apply mode for template match
-    // TM_CCOEFF seems like best all-around choice
+    // TM_CCOEFF seems like best all-around choice for the BGR match
     this->mode = mode;
 
     // TBD -- add parameter for threshold
     match_thr = 0.25;
 
-    // stash the template image
+    // create the BGR template
     create_template_image(tmpl_bgr, fixk, rcolors);
 
-    // match template against self to generate ideal score
+    // then create hue template from the BGR template
+    cv::Mat img_hls;
+    cv::Mat img_channels[3];
+    cv::cvtColor(tmpl_bgr, img_hls, cv::COLOR_BGR2HLS);
+    split(img_hls, img_channels);
+    tmpl_hue = img_channels[0];
+
+    // match BGR template against self to generate ideal score
     cv::Mat ideal_match;
     cv::matchTemplate(tmpl_bgr, tmpl_bgr, ideal_match, mode);
     cv::minMaxLoc(ideal_match, nullptr, &ideal_score, nullptr, nullptr);
@@ -189,42 +193,42 @@ void BGRLandmark::perform_match_cb(
 
 double BGRLandmark::check_grid_hues(cv::Mat& rimg, const cv::Point& rpt) const
 {
-    cv::Scalar sg[4] = { 0 };
-
-    const int koffs = 7;
-    const int ksize = koffs * 2 + 1;
+    double result = 0.0;
+    const int kcenter = tmpl_bgr.size().width / 2;
+    const int ksize = kcenter * 2 + 1;
 
     // get region of interest around target point
-    const cv::Point roi_pt = { rpt.x - koffs + tmpl_offset.width, rpt.y - koffs + tmpl_offset.height };
+    // template offset is already applied since match has been performed
     const cv::Size roi_sz = { ksize, ksize };
-    const cv::Rect roi = cv::Rect(roi_pt, roi_sz);
+    const cv::Rect roi = cv::Rect(rpt, roi_sz);
 
-    // extract hue image from region of interest
-    cv::Mat img_hue;
+    // extract image from region of interest
+    // then convert and extract hue channel
+    cv::Mat img_hls;
+    cv::Mat img_channels[3];
     cv::Mat img_roi(rimg(roi));
-    cv::cvtColor(img_roi, img_hue, cv::COLOR_BGR2HLS_FULL);
-    //cv::imwrite("crap.png", img_roi);
+    cv::cvtColor(img_roi, img_hls, cv::COLOR_BGR2HLS);
+    split(img_hls, img_channels);
+    
+    cv::imwrite("crap.png", img_roi);
+    cv::Mat img_mask = cv::Mat::zeros(tmpl_bgr.size(), CV_8UC1);
 
-    // get average hues along diagonals
+    // create an "X" mask for checking hues
     const int hue_sample_ct = 3;
     const int offset_from_center = 3;
-    for (int i = offset_from_center; i < offset_from_center + hue_sample_ct; i++)
+    for (int i = 2; i < 5; i++)
     {
-        sg[0] += cv::Scalar(img_hue.at<cv::Vec3b>({ koffs - i, koffs - i }));
-        sg[1] += cv::Scalar(img_hue.at<cv::Vec3b>({ koffs + i, koffs - i }));
-        sg[2] += cv::Scalar(img_hue.at<cv::Vec3b>({ koffs + i, koffs + i }));
-        sg[3] += cv::Scalar(img_hue.at<cv::Vec3b>({ koffs - i, koffs + i }));
+        //img_mask.at<unsigned char>({ koffs - i, koffs - i }) = 255;
+        img_mask.at<unsigned char>({ kcenter + i, kcenter - i }) = 255;
+        //img_mask.at<unsigned char>({ koffs + i, koffs + i }) = 255;
+        img_mask.at<unsigned char>({ kcenter - i, kcenter + i }) = 255;
     }
-
-    double scale = 1.0 / static_cast<double>(hue_sample_ct);
-    sg[0] *= scale;
-    sg[1] *= scale;
-    sg[2] *= scale;
-    sg[3] *= scale;
-
-    //double a = bgr_compare(sg[1], pattern.c00);
+    imwrite("crapm.png", img_mask);
     
-    return 0;
+    cv::Mat cmatch;
+    cv::matchTemplate(img_channels[0], tmpl_hue, cmatch, cv::TM_CCORR_NORMED, img_mask);
+    cv::minMaxLoc(cmatch, nullptr, &result, nullptr, nullptr);
+    return result;
 }
 
 

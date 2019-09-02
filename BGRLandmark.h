@@ -44,8 +44,9 @@ public:
     };
 
     // there 8 colors with max/min BGR components
-    static const cv::Scalar BGR_TO_HSL[8];
     static const cv::Scalar BGR_COLORS[8];
+    static const cv::Scalar BGR_TO_HLS[8];
+    static const cv::Scalar BGR_TO_HSV[8];
     static const cv::Scalar BGR_BORDER;
 
 
@@ -70,7 +71,7 @@ public:
 
     
     void init(
-        const int k = 7,
+        const int k = 9,
         const grid_colors_t& rcolors = PATTERN_0,
         const int mode = cv::TM_CCOEFF);
 
@@ -154,6 +155,9 @@ private:
     
     // the 2x2 grid BGR template
     cv::Mat tmpl_bgr;
+
+    // the 2x2 grid hue template
+    cv::Mat tmpl_hue;
 
     // offset for centering template location
     cv::Size tmpl_offset;
