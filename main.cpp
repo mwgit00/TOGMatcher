@@ -56,7 +56,6 @@ int n_record_ctr = 0;
 
 const std::vector<T_file_info> vfiles =
 {
-    { 0.20, "bgr_lm.png"},
     { 0.00, "circle_b_on_w.png"},
     { 0.00, "bottle_20perc_top_b_on_w.png"},
     { 0.00, "bottle_20perc_curve_b_on_w.png"},
@@ -67,6 +66,7 @@ const std::vector<T_file_info> vfiles =
 };
 
 size_t nfile = 0U;
+
 
 
 bool wait_and_check_keys(Knobs& rknobs)
@@ -92,6 +92,7 @@ bool wait_and_check_keys(Knobs& rknobs)
 
     return result;
 }
+
 
 
 void image_output(
@@ -135,6 +136,7 @@ void image_output(
 }
 
 
+
 void reload_template(TOGMatcher& rtogm, const T_file_info& rinfo, const int ksize)
 {
     const char * sxymtitle = "DX, DY, and Mask";
@@ -175,6 +177,7 @@ void reload_template(TOGMatcher& rtogm, const T_file_info& rinfo, const int ksiz
 }
 
 
+
 void loop2(void)
 {
 	Knobs theKnobs;
@@ -195,10 +198,7 @@ void loop2(void)
     //cvtColor(img_cx_bgr, img_cx_bgr, COLOR_BGR2YUV);
 
 	BGRLandmark bgrm;
-    TOGMatcher togm;
 	Ptr<CLAHE> pCLAHE = createCLAHE();
-
-    togm.create_template_from_file(".\\data\\bgr_lm.png", 3, 0.2);
 
 	// need a 0 as argument
 	VideoCapture vcap(0);
@@ -239,11 +239,7 @@ void loop2(void)
             //img_cx_bgr.copyTo(img_viewer(roi));
         }
 
-        // look for landmarks by shape in gray image
-        //cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
-        //togm.perform_match(img_gray, gmatch, false, 3);
-
-        // look for landmarks by color
+        // look for BGR landmarks
         std::vector<std::vector<cv::Point>> qcontours;
         std::vector<cv::Point> qpts;
         bgrm.perform_match(img_viewer, cmatch, qcontours, qpts, &qmax, &ptmax);
@@ -254,11 +250,10 @@ void loop2(void)
         {
             case Knobs::OUT_AUX:
             {
-                // show the raw template match result
-                // it is shifted and placed on top of blank image of original input size
+                // draw circles around all BGR landmarks
                 for (const auto& r : qpts)
                 {
-                    circle(img_viewer, r, 7, SCA_RED, 1);
+                    circle(img_viewer, r, 7, SCA_RED, 3);
                 }
                 break;
             }
@@ -280,14 +275,7 @@ void loop2(void)
                 // show red overlay of any matches that exceed arbitrary threshold
                 Mat match_mask;
                 const Size& tmpl_offset = bgrm.get_template_offset();
-                drawContours(img_viewer, qcontours, -1, SCA_RED, 11, LINE_8, noArray(), INT_MAX, tmpl_offset);
-                for (auto& r : qcontours)
-                {
-                    if (r.size() > 1)
-                    {
-                        //std::cout << r.size() << std::endl;
-                    }
-                }
+                drawContours(img_viewer, qcontours, -1, SCA_RED, 3, LINE_8, noArray(), INT_MAX, tmpl_offset);
                 break;
             }
             case Knobs::OUT_COLOR:
@@ -309,6 +297,7 @@ void loop2(void)
     vcap.release();
     destroyAllWindows();
 }
+
 
 
 void loop(void)

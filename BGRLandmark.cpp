@@ -77,15 +77,16 @@ const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_3 = { bgr_t::CYAN, bgr_t::
 BGRLandmark::BGRLandmark()
 {
     init();
+#if 0
     cv::Mat xx;
     cv::Mat xy;
     create_landmark_image(xx, 3.0, 0.25, PATTERN_0, { 255,255,255 });
     cv::imwrite("foobgrlm.png", xx);
     augment_landmark_image(xx, 0245, 3, 0.25, 0.75, { 255,255,255 }); // octal
     cv::imwrite("foobgraug.png", xx);
-
     create_checkerboard_image(xy, 3, 5, 0.5, 0.25);
     cv::imwrite("foobgrcb.png", xy);
+#endif
 }
 
 
@@ -112,7 +113,7 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     this->mode = mode;
 
     // TODO -- add parameter for threshold
-    match_thr = 0.20;
+    match_thr = 0.28;
 
     // create the BGR template
     create_template_image(tmpl_bgr, fixk, rcolors);
@@ -127,8 +128,8 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     // create a diagonal mask for checking hues
     tmpl_hue_mask = cv::Mat::zeros(tmpl_hue.size(), CV_8UC1);
     const int khalf = tmpl_bgr.size().width / 2;
-    const int hue_sample_ct = 3;
-    const int offset_from_center = 3;
+    //const int hue_sample_ct = 3;
+    //const int offset_from_center = 3;
     for (int i = 2; i <= khalf; i++)
     {
         // TODO -- use grid color info
@@ -137,7 +138,11 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
         //img_mask.at<unsigned char>({ koffs + i, koffs + i }) = 255;
         tmpl_hue_mask.at<unsigned char>({ khalf - i, khalf + i }) = 255;
     }
-    cv::imwrite("crapm.png", tmpl_hue_mask);
+
+    // TODO -- make these depend on grid dimension somehow
+    cv::circle(tmpl_hue_mask, { fixk - 1, 0 }, 3, 255, -1);
+    cv::circle(tmpl_hue_mask, { 0, fixk - 1 }, 3, 255, -1);
+    //cv::imwrite("hue_mask.png", tmpl_hue_mask);
 
     // match BGR template against self to generate ideal score
     cv::Mat ideal_match;
@@ -160,30 +165,31 @@ void BGRLandmark::perform_match(
     double * pmax,
     cv::Point * ppt)
 {
+    // do the BGR match
     matchTemplate(rsrc_bgr, tmpl_bgr, rtmatch, mode);
+
+    // localize each landmark based on absolute threshold
     std::vector<std::vector<cv::Point>> contours;
     cv::Mat match_masked = (rtmatch > (match_thr * ideal_score));
-
-    // localize each landmark
     findContours(match_masked, rcontours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
     for (const auto& r : rcontours)
     {
+        // find centroid associated with each landmark
+        // note that contour could be a single point or have area 0
         cv::Moments mm = cv::moments(r, true);
-
-        // contour could be a single point or have area 0
         cv::Point pt = r[0];
         if (mm.m00 > 0.0)
         {
             pt = cv::Point((mm.m10 / mm.m00), (mm.m01 / mm.m00));
         }
 
-        // then apply template offset
-        //pt = { pt.x + tmpl_offset.width, pt.y + tmpl_offset.height };
-
+        // apply hue test
         double f = check_grid_hues(rsrc_bgr, pt);
         if (f > 0.98)
         {
-            rpts.push_back(pt);
+            // all is well so apply template offset and save it
+            rpts.push_back({ pt.x + tmpl_offset.width, pt.y + tmpl_offset.height });
         }
     }
 
@@ -234,7 +240,7 @@ double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) c
     cv::cvtColor(img_roi, img_hls, cv::COLOR_BGR2HLS);
     split(img_hls, img_channels);
     
-    cv::imwrite("crap.png", img_roi);
+    //cv::imwrite("sample.png", img_roi);
 
     // match hues in the non-black-white squares using masked template
     cv::Mat cmatch;
@@ -313,7 +319,7 @@ void BGRLandmark::create_template_image(cv::Mat& rimg, int k, const grid_colors_
     cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
     cv::line(rimg, { kh, kh }, { kh, kh }, avg_all);
 
-    cv::imwrite("foobgr.png", rimg);
+    //cv::imwrite("foobgr.png", rimg);
 }
 
 

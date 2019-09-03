@@ -71,7 +71,7 @@ public:
 
     
     void init(
-        const int k = 9,
+        const int k = 11,
         const grid_colors_t& rcolors = PATTERN_0,
         const int mode = cv::TM_CCOEFF);
 
