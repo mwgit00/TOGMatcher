@@ -190,6 +190,7 @@ void loop2(void)
 	Mat img;
 	Mat img_viewer;
 	Mat img_gray;
+    Mat img_channels[3];
 	Mat cmatch;
     Mat gmatch;
 
@@ -233,16 +234,38 @@ void loop2(void)
             static_cast<int>(capture_size.height * img_scale));
         resize(img, img_viewer, viewer_size);
 
-        if (img_viewer.rows > img_cx_bgr.rows)
+        //if (img_viewer.rows > img_cx_bgr.rows)
+        //{
+        //    Rect roi = cv::Rect({ 0, 0 }, img_cx_bgr.size());
+        //    //img_cx_bgr.copyTo(img_viewer(roi));
+        //}
+
+        // apply the current channel setting
+        int nchan = theKnobs.get_channel();
+        if (nchan == Knobs::ALL_CHANNELS)
         {
-            Rect roi = cv::Rect({ 0, 0 }, img_cx_bgr.size());
-            //img_cx_bgr.copyTo(img_viewer(roi));
+            // combine all channels into grayscale
+            cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
+        }
+        else
+        {
+            // select only one BGR channel
+            split(img_viewer, img_channels);
+            img_gray = img_channels[nchan];
+        }
+
+        // apply the current histogram equalization setting
+        if (theKnobs.get_equ_hist_enabled())
+        {
+            double c = theKnobs.get_clip_limit();
+            pCLAHE->setClipLimit(c);
+            pCLAHE->apply(img_gray, img_gray);
         }
 
         // look for BGR landmarks
         std::vector<std::vector<cv::Point>> qcontours;
         std::vector<cv::Point> qpts;
-        bgrm.perform_match(img_viewer, cmatch, qcontours, qpts, &qmax, &ptmax);
+        bgrm.perform_match_gray(img_gray, cmatch, qcontours, qpts, &qmax, &ptmax);
 
         // apply the current output mode
         // content varies but all final output images are BGR
@@ -275,6 +298,7 @@ void loop2(void)
                 // show red overlay of any matches that exceed arbitrary threshold
                 Mat match_mask;
                 const Size& tmpl_offset = bgrm.get_template_offset();
+                cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
                 drawContours(img_viewer, qcontours, -1, SCA_RED, 3, LINE_8, noArray(), INT_MAX, tmpl_offset);
                 break;
             }

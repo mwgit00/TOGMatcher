@@ -77,7 +77,7 @@ const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_3 = { bgr_t::CYAN, bgr_t::
 BGRLandmark::BGRLandmark()
 {
     init();
-#if 0
+#if 1
     cv::Mat xx;
     cv::Mat xy;
     create_landmark_image(xx, 3.0, 0.25, PATTERN_0, { 255,255,255 });
@@ -100,6 +100,8 @@ BGRLandmark::~BGRLandmark()
 
 void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode)
 {
+    is_grid_pattern = true;
+    
     // fix k to be odd and in range 3-15
     int fixk = ((k / 2) * 2) + 1;
     RAIL_MIN(fixk, 3);
@@ -113,10 +115,15 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     this->mode = mode;
 
     // TODO -- add parameter for threshold
-    match_thr = 0.28;
+    match_thr = 0.25;
 
     // create the BGR template
-    create_template_image(tmpl_bgr, fixk, rcolors);
+    create_template_image(tmpl_bgr, fixk, { bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE});
+
+    cv::cvtColor(tmpl_bgr, tmpl_gray_p, cv::COLOR_BGR2GRAY);
+    cv::rotate(tmpl_gray_p, tmpl_gray_n, cv::ROTATE_90_CLOCKWISE);
+    imwrite("foogp.png", tmpl_gray_p);
+    imwrite("foogn.png", tmpl_gray_n);
 
     // then create hue template from the BGR template
     cv::Mat img_hls;
@@ -202,6 +209,59 @@ void BGRLandmark::perform_match(
         }
     }
 }
+
+
+
+void BGRLandmark::perform_match_gray(
+    const cv::Mat& rsrc,
+    cv::Mat& rtmatch,
+    std::vector<std::vector<cv::Point>>& rcontours,
+    std::vector<cv::Point>& rpts,
+    double* pmax,
+    cv::Point* ppt)
+{
+    cv::Mat tmatch0;
+    cv::Mat tmatch1;
+    int xmode = cv::TM_CCOEFF_NORMED;
+    matchTemplate(rsrc, tmpl_gray_p, tmatch0, xmode);
+    matchTemplate(rsrc, tmpl_gray_n, tmatch1, xmode);
+    rtmatch = (tmatch0 - tmatch1);
+    rtmatch = abs(rtmatch);
+
+    // localize each landmark based on absolute threshold
+    std::vector<std::vector<cv::Point>> contours;
+    cv::Mat match_masked = (rtmatch > 1.8);
+    findContours(match_masked, rcontours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+
+    for (const auto& r : rcontours)
+    {
+        // find centroid associated with each landmark
+        // note that contour could be a single point or have area 0
+        cv::Moments mm = cv::moments(r, true);
+        cv::Point pt = r[0];
+        if (mm.m00 > 0.0)
+        {
+            pt = cv::Point((mm.m10 / mm.m00), (mm.m01 / mm.m00));
+        }
+
+        // apply hue test
+        {
+            // all is well so apply template offset and save it
+            rpts.push_back({ pt.x + tmpl_offset.width, pt.y + tmpl_offset.height });
+        }
+    }
+
+    if (pmax != nullptr)
+    {
+        cv::minMaxLoc(rtmatch, nullptr, pmax, nullptr, ppt);
+        if (false)
+        {
+            *pmax = *pmax / ideal_score;
+        }
+    }
+
+}
+
 
 
 void BGRLandmark::perform_match_cb(
@@ -319,7 +379,7 @@ void BGRLandmark::create_template_image(cv::Mat& rimg, int k, const grid_colors_
     cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
     cv::line(rimg, { kh, kh }, { kh, kh }, avg_all);
 
-    //cv::imwrite("foobgr.png", rimg);
+    cv::imwrite("foobgr.png", rimg);
 }
 
 
@@ -362,15 +422,28 @@ void BGRLandmark::create_landmark_image(
     // create image with just the grid
     cv::Mat img_grid = cv::Mat::zeros({ kgrid, kgrid }, CV_8UC3);
 
-    cv::Rect roi = cv::Rect({ kborder, kborder }, img_grid.size());
-
-    // fill in 2x2 blocks (clockwise from upper left)
-    cv::rectangle(img_grid, { 0, 0, kgridh - 1, kgridh - 1 }, colors[0], -1);
-    cv::rectangle(img_grid, { kgridh, 0, kgridh, kgridh }, colors[1], -1);
-    cv::rectangle(img_grid, { kgridh, kgridh, kgrid - 1, kgrid - 1 }, colors[2], -1);
-    cv::rectangle(img_grid, { 0, kgridh, kgridh, kgridh }, colors[3], -1);
+    if (false)
+    {
+        // fill in 2x2 blocks (clockwise from upper left)
+        cv::rectangle(img_grid, { 0, 0, kgridh - 1, kgridh - 1 }, colors[0], -1);
+        cv::rectangle(img_grid, { kgridh, 0, kgridh, kgridh }, colors[1], -1);
+        cv::rectangle(img_grid, { kgridh, kgridh, kgrid - 1, kgrid - 1 }, colors[2], -1);
+        cv::rectangle(img_grid, { 0, kgridh, kgridh, kgridh }, colors[3], -1);
+    }
+    else
+    {
+        // create round "X" pattern
+        const cv::Point ell_ctr = { kgridh, kgridh };
+        const cv::Size ell_axes = { kgridh, kgridh };
+        cv::rectangle(img_grid, { 0, 0, kgrid, kgrid }, border_color, -1);
+        cv::ellipse(img_grid, ell_ctr, ell_axes, -135.0, 0.0, 90.0, colors[0], -1, cv::LINE_AA);
+        cv::ellipse(img_grid, ell_ctr, ell_axes, -135.0, 90.0, 180.0, colors[1], -1, cv::LINE_AA);
+        cv::ellipse(img_grid, ell_ctr, ell_axes, -135.0, 180.0, 270.0, colors[2], -1, cv::LINE_AA);
+        cv::ellipse(img_grid, ell_ctr, ell_axes, -135.0, 270.0, 360.0, colors[3], -1, cv::LINE_AA);
+    }
 
     // copy grid into image with border
+    cv::Rect roi = cv::Rect({ kborder, kborder }, img_grid.size());
     img_grid.copyTo(rimg(roi));
 }
 
@@ -411,7 +484,7 @@ void BGRLandmark::create_checkerboard_image(
     // create a 2x2 grid with no border
     // this will be replicated in the checkerboard
     cv::Mat img_grid;
-    create_landmark_image(img_grid, dim_grid_fix, 0.0, rcolors, { 0,0,0 }, dpi);
+    create_landmark_image(img_grid, dim_grid_fix, 0.0, rcolors, { 255,255,255 }, dpi);
 
     // create image that will contain border and grid
     // fill it with border color

@@ -83,6 +83,15 @@ public:
         double * pmax = nullptr,
         cv::Point * ppt = nullptr);
 
+    void perform_match_gray(
+        const cv::Mat& rsrc,
+        cv::Mat& rtmatch,
+        std::vector<std::vector<cv::Point>>& rcontours,
+        std::vector<cv::Point>& rpts,
+        double* pmax = nullptr,
+        cv::Point* ppt = nullptr);
+
+
     void perform_match_cb(
         const cv::Mat& rsrc,
         cv::Mat& rtmatch);
@@ -141,6 +150,9 @@ private:
 
 private:
 
+    // 2x2 grid or circular "X" pattern
+    bool is_grid_pattern;
+
     // mode for matchTemplate
     int mode;
 
@@ -159,6 +171,9 @@ private:
     // the 2x2 grid hue template and mask
     cv::Mat tmpl_hue;
     cv::Mat tmpl_hue_mask;
+
+    cv::Mat tmpl_gray_p;
+    cv::Mat tmpl_gray_n;
 
     // offset for centering template location
     cv::Size tmpl_offset;
