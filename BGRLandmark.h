@@ -79,34 +79,12 @@ public:
         const cv::Mat& rsrc,
         cv::Mat& rtmatch,
         std::vector<std::vector<cv::Point>>& rcontours,
-        std::vector<cv::Point>& rpts,
-        double * pmax = nullptr,
-        cv::Point * ppt = nullptr);
-
-    void perform_match_gray(
-        const cv::Mat& rsrc,
-        cv::Mat& rtmatch,
-        std::vector<std::vector<cv::Point>>& rcontours,
-        std::vector<cv::Point>& rpts,
-        double* pmax = nullptr,
-        cv::Point* ppt = nullptr);
-
-
-    void perform_match_cb(
-        const cv::Mat& rsrc,
-        cv::Mat& rtmatch);
+        std::vector<cv::Point>& rpts);
 
     const cv::Size& get_template_offset(void) const { return tmpl_offset; }
 
     double check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) const;
 
-    
-    // returns color index that is inverse of input color index
-    static bgr_t invert_bgr(const bgr_t color);
-    
-    // inverts the color indexes for a grid
-    static grid_colors_t invert_grid_colors(const grid_colors_t& rcolors);
-    
     
     // creates printable 2x2 landmark image
     static void create_landmark_image(

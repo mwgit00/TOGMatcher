@@ -180,19 +180,18 @@ void reload_template(TOGMatcher& rtogm, const T_file_info& rinfo, const int ksiz
 
 void loop2(void)
 {
-	Knobs theKnobs;
-	int op_id;
+    Knobs theKnobs;
+    int op_id;
 
-	double qmax;
+    double qmax;
+    Size capture_size;
     Point ptmax;
-	Size capture_size;
 
-	Mat img;
-	Mat img_viewer;
-	Mat img_gray;
+    Mat img;
+    Mat img_viewer;
+    Mat img_gray;
     Mat img_channels[3];
-	Mat cmatch;
-    Mat gmatch;
+    Mat tmatch;
 
     Mat img_cx_bgr;// = imread(".\\foobgrcb.png", cv::IMREAD_COLOR);
     //Mat img_cx_bgr;
@@ -262,10 +261,11 @@ void loop2(void)
             pCLAHE->apply(img_gray, img_gray);
         }
 
-        // look for BGR landmarks
+        // look for landmarks
         std::vector<std::vector<cv::Point>> qcontours;
         std::vector<cv::Point> qpts;
-        bgrm.perform_match_gray(img_gray, cmatch, qcontours, qpts, &qmax, &ptmax);
+        bgrm.perform_match(img_gray, tmatch, qcontours, qpts);
+        minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
 
         // apply the current output mode
         // content varies but all final output images are BGR
@@ -286,9 +286,9 @@ void loop2(void)
                 // it is shifted and placed on top of blank image of original input size
                 const Size& tmpl_offset = bgrm.get_template_offset();
                 Mat full_tmatch = Mat::zeros(img_viewer.size(), CV_32F);
-                Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, cmatch.cols, cmatch.rows);
-                normalize(cmatch, cmatch, 0, 1, cv::NORM_MINMAX);
-                cmatch.copyTo(full_tmatch(roi));
+                Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, tmatch.cols, tmatch.rows);
+                normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
+                tmatch.copyTo(full_tmatch(roi));
                 cvtColor(full_tmatch, img_viewer, COLOR_GRAY2BGR);
                 break;
             }

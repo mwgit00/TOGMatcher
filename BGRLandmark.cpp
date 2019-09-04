@@ -165,60 +165,10 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
 
 
 void BGRLandmark::perform_match(
-    const cv::Mat& rsrc_bgr,
-    cv::Mat& rtmatch,
-    std::vector<std::vector<cv::Point>>& rcontours,
-    std::vector<cv::Point>& rpts,
-    double * pmax,
-    cv::Point * ppt)
-{
-    // do the BGR match
-    matchTemplate(rsrc_bgr, tmpl_bgr, rtmatch, mode);
-
-    // localize each landmark based on absolute threshold
-    std::vector<std::vector<cv::Point>> contours;
-    cv::Mat match_masked = (rtmatch > (match_thr * ideal_score));
-    findContours(match_masked, rcontours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-
-    for (const auto& r : rcontours)
-    {
-        // find centroid associated with each landmark
-        // note that contour could be a single point or have area 0
-        cv::Moments mm = cv::moments(r, true);
-        cv::Point pt = r[0];
-        if (mm.m00 > 0.0)
-        {
-            pt = cv::Point((mm.m10 / mm.m00), (mm.m01 / mm.m00));
-        }
-
-        // apply hue test
-        double f = check_grid_hues(rsrc_bgr, pt);
-        if (f > 0.98)
-        {
-            // all is well so apply template offset and save it
-            rpts.push_back({ pt.x + tmpl_offset.width, pt.y + tmpl_offset.height });
-        }
-    }
-
-    if (pmax != nullptr)
-    {
-        cv::minMaxLoc(rtmatch, nullptr, pmax, nullptr, ppt);
-        if (ideal_score > 0.0)
-        {
-            *pmax = *pmax / ideal_score;
-        }
-    }
-}
-
-
-
-void BGRLandmark::perform_match_gray(
     const cv::Mat& rsrc,
     cv::Mat& rtmatch,
     std::vector<std::vector<cv::Point>>& rcontours,
-    std::vector<cv::Point>& rpts,
-    double* pmax,
-    cv::Point* ppt)
+    std::vector<cv::Point>& rpts)
 {
     cv::Mat tmatch0;
     cv::Mat tmatch1;
@@ -230,7 +180,7 @@ void BGRLandmark::perform_match_gray(
 
     // localize each landmark based on absolute threshold
     std::vector<std::vector<cv::Point>> contours;
-    cv::Mat match_masked = (rtmatch > 1.8);
+    cv::Mat match_masked = (rtmatch > 1.7);
     findContours(match_masked, rcontours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 
     for (const auto& r : rcontours)
@@ -244,44 +194,14 @@ void BGRLandmark::perform_match_gray(
             pt = cv::Point((mm.m10 / mm.m00), (mm.m01 / mm.m00));
         }
 
-        // apply hue test
+        // TODO -- apply hue test
         {
             // all is well so apply template offset and save it
             rpts.push_back({ pt.x + tmpl_offset.width, pt.y + tmpl_offset.height });
         }
     }
-
-    if (pmax != nullptr)
-    {
-        cv::minMaxLoc(rtmatch, nullptr, pmax, nullptr, ppt);
-        if (false)
-        {
-            *pmax = *pmax / ideal_score;
-        }
-    }
-
 }
 
-
-
-void BGRLandmark::perform_match_cb(
-    const cv::Mat& rsrc,
-    cv::Mat& rtmatch)
-{
-    const int k = 7;
-    cv::Mat t0;
-    cv::Mat t1;
-    cv::Mat tmatch0;
-    cv::Mat tmatch1;
-    grid_colors_t PATTERN_0_INV = invert_grid_colors(PATTERN_0);
-    create_template_image(t0, k, PATTERN_0);
-    create_template_image(t1, k, PATTERN_0_INV);
-    const int xmode = cv::TM_CCOEFF; // TM_CCOEFF, TM_CCORR_NORMED good
-    matchTemplate(rsrc, t0, tmatch0, xmode);
-    matchTemplate(rsrc, t1, tmatch1, xmode);
-    rtmatch = (tmatch0 - tmatch1);
-    rtmatch = abs(rtmatch);
-}
 
 
 double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) const
@@ -313,38 +233,6 @@ double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) c
 
 ///////////////////////////////////////////////////////////////////////////////
 // CLASS STATIC FUNCTIONS
-
-BGRLandmark::bgr_t BGRLandmark::invert_bgr(const bgr_t color)
-{
-    bgr_t result = bgr_t::BLACK;
-    switch (color)
-    { 
-        case bgr_t::BLACK: result = bgr_t::WHITE; break;
-        case bgr_t::RED: result = bgr_t::CYAN; break;
-        case bgr_t::GREEN: result = bgr_t::MAGENTA; break;
-        case bgr_t::YELLOW: result = bgr_t::BLUE; break;
-        case bgr_t::BLUE: result = bgr_t::YELLOW; break;
-        case bgr_t::MAGENTA: result = bgr_t::GREEN; break;
-        case bgr_t::CYAN: result = bgr_t::RED; break;
-        case bgr_t::WHITE: result = bgr_t::BLACK; break;
-        default: break;
-    }
-    return result;
-}
-
-
-
-BGRLandmark::grid_colors_t BGRLandmark::invert_grid_colors(const grid_colors_t& rcolors)
-{
-    grid_colors_t result;
-    result.c00 = invert_bgr(rcolors.c00);
-    result.c01 = invert_bgr(rcolors.c01);
-    result.c11 = invert_bgr(rcolors.c11);
-    result.c10 = invert_bgr(rcolors.c10);
-    return result;
-}
-
-
 
 void BGRLandmark::create_template_image(cv::Mat& rimg, int k, const grid_colors_t& rcolors)
 {
@@ -378,6 +266,8 @@ void BGRLandmark::create_template_image(cv::Mat& rimg, int k, const grid_colors_
     // fill in average of all blocks at central point
     cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
     cv::line(rimg, { kh, kh }, { kh, kh }, avg_all);
+
+    // TODO -- rotate to make "X" pattern
 
     cv::imwrite("foobgr.png", rimg);
 }
@@ -432,7 +322,8 @@ void BGRLandmark::create_landmark_image(
     }
     else
     {
-        // create round "X" pattern
+        // create round "X" pattern that fits in grid box
+        // colors are rotated by 45 degrees, upper-left color for grid becomes top color in "X"
         const cv::Point ell_ctr = { kgridh, kgridh };
         const cv::Size ell_axes = { kgridh, kgridh };
         cv::rectangle(img_grid, { 0, 0, kgrid, kgrid }, border_color, -1);
