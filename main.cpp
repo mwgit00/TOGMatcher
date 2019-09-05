@@ -262,9 +262,10 @@ void loop2(void)
         }
 
         // look for landmarks
-        std::vector<cv::Point> qpts;
-        bgrm.perform_match(img_gray, tmatch, qpts);
+        std::vector<BGRLandmark::landmark_info_t> qinfo;
+        bgrm.perform_match(img_gray, tmatch, qinfo);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
+        bgrm.check_grid_hues(img_viewer, ptmax);
 
         // apply the current output mode
         // content varies but all final output images are BGR
@@ -273,9 +274,9 @@ void loop2(void)
             case Knobs::OUT_AUX:
             {
                 // draw circles around all BGR landmarks
-                for (const auto& r : qpts)
+                for (const auto& r : qinfo)
                 {
-                    circle(img_viewer, r, 7, SCA_RED, 3);
+                    circle(img_viewer, r.ctr, 7, (r.diff > 0.0) ? SCA_RED : SCA_BLUE, 3);
                 }
                 break;
             }

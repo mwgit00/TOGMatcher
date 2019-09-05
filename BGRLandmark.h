@@ -30,6 +30,12 @@ class BGRLandmark
 {
 public:
 
+    typedef struct
+    {
+        cv::Point ctr;
+        float diff;
+    } landmark_info_t;
+
     // names of colors with max and/or min BGR components
     enum class bgr_t : int
     {
@@ -59,11 +65,12 @@ public:
         bgr_t c10;
     } grid_colors_t;
 
-    // a default checkerboard will have one of these patterns at each 2x2 corner
+    // some standard colored checkerboard patterns
     static const grid_colors_t PATTERN_0;
-    static const grid_colors_t PATTERN_1;
-    static const grid_colors_t PATTERN_2;
-    static const grid_colors_t PATTERN_3;
+    static const grid_colors_t PATTERN_A;
+    static const grid_colors_t PATTERN_B;
+    static const grid_colors_t PATTERN_C;
+    static const grid_colors_t PATTERN_D;
 
 
     BGRLandmark();
@@ -72,13 +79,13 @@ public:
     
     void init(
         const int k = 11,
-        const grid_colors_t& rcolors = PATTERN_0,
+        const grid_colors_t& rcolors = PATTERN_A,
         const bool is_rot_45 = false);
 
     void perform_match(
         const cv::Mat& rsrc,
         cv::Mat& rtmatch,
-        std::vector<cv::Point>& rpts);
+        std::vector<BGRLandmark::landmark_info_t>& rpts);
 
     const cv::Size& get_template_offset(void) const { return tmpl_offset; }
 
@@ -90,7 +97,7 @@ public:
         cv::Mat& rimg,
         const double dim_grid = 1.0,
         const double dim_border = 0.25,
-        const grid_colors_t& rcolors = PATTERN_0,
+        const grid_colors_t& rcolors = PATTERN_A,
         const cv::Scalar border_color = BGR_BORDER,
         const bool is_rot_45 = false,
         const int dpi = 96);
@@ -102,7 +109,7 @@ public:
         const int yrepeat,
         const double dim_grid = 2.0,
         const double dim_border = 0.25,
-        const grid_colors_t& rcolors = PATTERN_0,
+        const grid_colors_t& rcolors = PATTERN_A,
         const cv::Scalar border_color = BGR_BORDER,
         const bool is_rot_45 = false,
         const int dpi = 96);
@@ -126,10 +133,7 @@ private:
     // threshold for match consideration
     double match_thr;
 
-    // the 2x2 grid hue template and mask
-    cv::Mat tmpl_hue;
-    cv::Mat tmpl_hue_mask;
-
+    // templates for 2x2 checkerboard grid
     cv::Mat tmpl_gray_p;
     cv::Mat tmpl_gray_n;
 

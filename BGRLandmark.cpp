@@ -67,17 +67,18 @@ const cv::Scalar BGRLandmark::BGR_TO_HSV[8] =
 
 const cv::Scalar BGRLandmark::BGR_BORDER = { 128, 128, 128 };
 
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_0 = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_1 = { bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_2 = { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_3 = { bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_0 = { bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_A = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_B = { bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_C = { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_D = { bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK };
 
 
 
 BGRLandmark::BGRLandmark()
 {
-    init(11, PATTERN_0, false);
-#if 1
+    init();
+#if 0
     cv::Mat xx;
     cv::Mat xy;
     create_landmark_image(xx, 3.0, 0.25, PATTERN_0, { 255,255,255 });
@@ -110,42 +111,14 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const bool is_
     match_thr = 0.25;
 
     // create the templates
+    // TODO -- do 90 degree rotation based on colors
     cv::Mat tmpl_bgr;
-    create_template_image(
-        tmpl_bgr,
-        fixk,
-        { bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE}, is_rot_45);
+    create_template_image(tmpl_bgr, fixk, PATTERN_0, is_rot_45);
     
     cv::cvtColor(tmpl_bgr, tmpl_gray_p, cv::COLOR_BGR2GRAY);
     cv::rotate(tmpl_gray_p, tmpl_gray_n, cv::ROTATE_90_CLOCKWISE);
-    imwrite("foogp.png", tmpl_gray_p);
-    imwrite("foogn.png", tmpl_gray_n);
-
-    // then create hue template from the BGR template
-    cv::Mat img_hls;
-    cv::Mat img_channels[3];
-    cv::cvtColor(tmpl_bgr, img_hls, cv::COLOR_BGR2HLS);
-    split(img_hls, img_channels);
-    tmpl_hue = img_channels[0];
-
-    // create a diagonal mask for checking hues
-    tmpl_hue_mask = cv::Mat::zeros(tmpl_hue.size(), CV_8UC1);
-    const int khalf = tmpl_bgr.size().width / 2;
-    //const int hue_sample_ct = 3;
-    //const int offset_from_center = 3;
-    for (int i = 2; i <= khalf; i++)
-    {
-        // TODO -- use grid color info
-        //img_mask.at<unsigned char>({ koffs - i, koffs - i }) = 255;
-        tmpl_hue_mask.at<unsigned char>({ khalf + i, khalf - i }) = 255;
-        //img_mask.at<unsigned char>({ koffs + i, koffs + i }) = 255;
-        tmpl_hue_mask.at<unsigned char>({ khalf - i, khalf + i }) = 255;
-    }
-
-    // TODO -- make these depend on grid dimension somehow
-    cv::circle(tmpl_hue_mask, { fixk - 1, 0 }, 3, 255, -1);
-    cv::circle(tmpl_hue_mask, { 0, fixk - 1 }, 3, 255, -1);
-    //cv::imwrite("hue_mask.png", tmpl_hue_mask);
+    //imwrite("foogp.png", tmpl_gray_p);
+    //imwrite("foogn.png", tmpl_gray_n);
 
     // stash offset for this template
     const int fixkh = fixk / 2;
@@ -158,7 +131,7 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const bool is_
 void BGRLandmark::perform_match(
     const cv::Mat& rsrc,
     cv::Mat& rtmatch,
-    std::vector<cv::Point>& rpts)
+    std::vector<BGRLandmark::landmark_info_t>& rinfo)
 {
     const int xmode = cv::TM_CCOEFF_NORMED;
 
@@ -185,10 +158,16 @@ void BGRLandmark::perform_match(
             pt = cv::Point((mm.m10 / mm.m00), (mm.m01 / mm.m00));
         }
 
-        // TODO -- apply hue test
+        // positive diff means black in upper-left/lower-right
+        // negative diff means black in lower-left/upper-right
+        float pix_p = tmatch0.at<float>(pt);
+        float pix_n = tmatch1.at<float>(pt);
+        float diff = pix_p - pix_n;
+
+        // TODO -- apply hue test ???
         {
             // all is well so apply template offset and save it
-            rpts.push_back({ pt.x + tmpl_offset.width, pt.y + tmpl_offset.height });
+            rinfo.push_back({ { pt.x + tmpl_offset.width, pt.y + tmpl_offset.height }, diff });
         }
     }
 }
@@ -210,14 +189,12 @@ double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) c
     cv::Mat img_roi(rimg(roi));
     cv::cvtColor(img_roi, img_hls, cv::COLOR_BGR2HLS);
     split(img_hls, img_channels);
-    
-    //cv::imwrite("sample.png", img_roi);
 
-    // match hues in the non-black-white squares using masked template
-    cv::Mat cmatch;
-    cv::matchTemplate(img_channels[0], tmpl_hue, cmatch, cv::TM_CCORR_NORMED, tmpl_hue_mask);
-    cv::minMaxLoc(cmatch, nullptr, &result, nullptr, nullptr);
-    return result;
+    // ???
+    
+    cv::imwrite("sample.png", img_roi);
+
+    return 0.0;
 }
 
 
@@ -270,7 +247,7 @@ void BGRLandmark::create_template_image(
         cv::warpAffine(rimg, rimg, rot, rimg.size());
     }
 
-    cv::imwrite("foobgr.png", rimg);
+    //cv::imwrite("foobgr.png", rimg);
 }
 
 
