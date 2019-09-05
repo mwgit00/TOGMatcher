@@ -76,14 +76,12 @@ const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_3 = { bgr_t::CYAN, bgr_t::
 
 BGRLandmark::BGRLandmark()
 {
-    init();
+    init(11, PATTERN_0, false);
 #if 1
     cv::Mat xx;
     cv::Mat xy;
     create_landmark_image(xx, 3.0, 0.25, PATTERN_0, { 255,255,255 });
     cv::imwrite("foobgrlm.png", xx);
-    augment_landmark_image(xx, 0245, 3, 0.25, 0.75, { 255,255,255 }); // octal
-    cv::imwrite("foobgraug.png", xx);
     create_checkerboard_image(xy, 3, 5, 0.5, 0.25);
     cv::imwrite("foobgrcb.png", xy);
 #endif
@@ -98,10 +96,8 @@ BGRLandmark::~BGRLandmark()
 
 
 
-void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode)
+void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const bool is_rot_45)
 {
-    is_grid_pattern = true;
-    
     // fix k to be odd and in range 3-15
     int fixk = ((k / 2) * 2) + 1;
     RAIL_MIN(fixk, 3);
@@ -110,16 +106,16 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     // stash the color pattern
     pattern = rcolors;
     
-    // apply mode for template match
-    // TM_CCOEFF seems like best all-around choice for the BGR match
-    this->mode = mode;
-
     // TODO -- add parameter for threshold
     match_thr = 0.25;
 
-    // create the BGR template
-    create_template_image(tmpl_bgr, fixk, { bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE});
-
+    // create the templates
+    cv::Mat tmpl_bgr;
+    create_template_image(
+        tmpl_bgr,
+        fixk,
+        { bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE}, is_rot_45);
+    
     cv::cvtColor(tmpl_bgr, tmpl_gray_p, cv::COLOR_BGR2GRAY);
     cv::rotate(tmpl_gray_p, tmpl_gray_n, cv::ROTATE_90_CLOCKWISE);
     imwrite("foogp.png", tmpl_gray_p);
@@ -151,11 +147,6 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
     cv::circle(tmpl_hue_mask, { 0, fixk - 1 }, 3, 255, -1);
     //cv::imwrite("hue_mask.png", tmpl_hue_mask);
 
-    // match BGR template against self to generate ideal score
-    cv::Mat ideal_match;
-    cv::matchTemplate(tmpl_bgr, tmpl_bgr, ideal_match, mode);
-    cv::minMaxLoc(ideal_match, nullptr, &ideal_score, nullptr, nullptr);
-
     // stash offset for this template
     const int fixkh = fixk / 2;
     tmpl_offset.width = fixkh;
@@ -167,12 +158,12 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const int mode
 void BGRLandmark::perform_match(
     const cv::Mat& rsrc,
     cv::Mat& rtmatch,
-    std::vector<std::vector<cv::Point>>& rcontours,
     std::vector<cv::Point>& rpts)
 {
+    const int xmode = cv::TM_CCOEFF_NORMED;
+
     cv::Mat tmatch0;
     cv::Mat tmatch1;
-    int xmode = cv::TM_CCOEFF_NORMED;
     matchTemplate(rsrc, tmpl_gray_p, tmatch0, xmode);
     matchTemplate(rsrc, tmpl_gray_n, tmatch1, xmode);
     rtmatch = (tmatch0 - tmatch1);
@@ -181,9 +172,9 @@ void BGRLandmark::perform_match(
     // localize each landmark based on absolute threshold
     std::vector<std::vector<cv::Point>> contours;
     cv::Mat match_masked = (rtmatch > 1.7);
-    findContours(match_masked, rcontours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+    findContours(match_masked, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 
-    for (const auto& r : rcontours)
+    for (const auto& r : contours)
     {
         // find centroid associated with each landmark
         // note that contour could be a single point or have area 0
@@ -210,7 +201,7 @@ double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) c
 
     // get region of interest around target point
     // match has been done and template offset has already been applied so no need for it here
-    const cv::Rect roi = cv::Rect(rpt, tmpl_bgr.size());
+    const cv::Rect roi = cv::Rect(rpt, tmpl_gray_n.size());
     
     // extract image from region of interest
     // then convert and extract hue channel
@@ -234,7 +225,11 @@ double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) c
 ///////////////////////////////////////////////////////////////////////////////
 // CLASS STATIC FUNCTIONS
 
-void BGRLandmark::create_template_image(cv::Mat& rimg, int k, const grid_colors_t& rcolors)
+void BGRLandmark::create_template_image(
+    cv::Mat& rimg,
+    const int k,
+    const grid_colors_t& rcolors,
+    const bool is_rot_45)
 {
     const int kh = k / 2;
 
@@ -267,7 +262,13 @@ void BGRLandmark::create_template_image(cv::Mat& rimg, int k, const grid_colors_
     cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
     cv::line(rimg, { kh, kh }, { kh, kh }, avg_all);
 
-    // TODO -- rotate to make "X" pattern
+    if (is_rot_45)
+    {
+        // the scale of 1.42 (approx. square root of 2) fills the grid
+        const cv::Point2f fctr(static_cast<double>(kh), static_cast<double>(kh));
+        cv::Mat rot = cv::getRotationMatrix2D(fctr, 45.0, 1.42);
+        cv::warpAffine(rimg, rimg, rot, rimg.size());
+    }
 
     cv::imwrite("foobgr.png", rimg);
 }
@@ -280,6 +281,7 @@ void BGRLandmark::create_landmark_image(
     const double dim_border,
     const grid_colors_t& rcolors,
     const cv::Scalar border_color,
+    const bool is_rot_45,
     const int dpi)
 {
     // set limits on 2x2 grid size (0.5 inch to 6.0 inch)
@@ -312,25 +314,20 @@ void BGRLandmark::create_landmark_image(
     // create image with just the grid
     cv::Mat img_grid = cv::Mat::zeros({ kgrid, kgrid }, CV_8UC3);
 
-    if (false)
+    // fill in 2x2 blocks (clockwise from upper left)
+    cv::rectangle(img_grid, { 0, 0, kgridh - 1, kgridh - 1 }, colors[0], -1);
+    cv::rectangle(img_grid, { kgridh, 0, kgridh, kgridh }, colors[1], -1);
+    cv::rectangle(img_grid, { kgridh, kgridh, kgrid - 1, kgrid - 1 }, colors[2], -1);
+    cv::rectangle(img_grid, { 0, kgridh, kgridh, kgridh }, colors[3], -1);
+
+    // can rotate 45 degrees to make an "X" pattern instead of a grid
+    if (is_rot_45)
     {
-        // fill in 2x2 blocks (clockwise from upper left)
-        cv::rectangle(img_grid, { 0, 0, kgridh - 1, kgridh - 1 }, colors[0], -1);
-        cv::rectangle(img_grid, { kgridh, 0, kgridh, kgridh }, colors[1], -1);
-        cv::rectangle(img_grid, { kgridh, kgridh, kgrid - 1, kgrid - 1 }, colors[2], -1);
-        cv::rectangle(img_grid, { 0, kgridh, kgridh, kgridh }, colors[3], -1);
-    }
-    else
-    {
-        // create round "X" pattern that fits in grid box
-        // colors are rotated by 45 degrees, upper-left color for grid becomes top color in "X"
-        const cv::Point ell_ctr = { kgridh, kgridh };
-        const cv::Size ell_axes = { kgridh, kgridh };
-        cv::rectangle(img_grid, { 0, 0, kgrid, kgrid }, border_color, -1);
-        cv::ellipse(img_grid, ell_ctr, ell_axes, -135.0, 0.0, 90.0, colors[0], -1, cv::LINE_AA);
-        cv::ellipse(img_grid, ell_ctr, ell_axes, -135.0, 90.0, 180.0, colors[1], -1, cv::LINE_AA);
-        cv::ellipse(img_grid, ell_ctr, ell_axes, -135.0, 180.0, 270.0, colors[2], -1, cv::LINE_AA);
-        cv::ellipse(img_grid, ell_ctr, ell_axes, -135.0, 270.0, 360.0, colors[3], -1, cv::LINE_AA);
+        // the half-pixel offset centers things nicely for grid with even dimensions
+        // the scale of 1.42 (approx. square root of 2) fills the grid
+        const cv::Point2f fctr(static_cast<double>(kgridh) - 0.5, static_cast<double>(kgridh) - 0.5);
+        cv::Mat rot = cv::getRotationMatrix2D(fctr, 45.0, 1.42);
+        cv::warpAffine(img_grid, img_grid, rot, img_grid.size());
     }
 
     // copy grid into image with border
@@ -348,6 +345,7 @@ void BGRLandmark::create_checkerboard_image(
     const double dim_border,
     const grid_colors_t& rcolors,
     const cv::Scalar border_color,
+    const bool is_rot_45,
     const int dpi)
 {
     // set limits on 2x2 grid size (0.5 inch to 2.0 inch)
@@ -375,7 +373,7 @@ void BGRLandmark::create_checkerboard_image(
     // create a 2x2 grid with no border
     // this will be replicated in the checkerboard
     cv::Mat img_grid;
-    create_landmark_image(img_grid, dim_grid_fix, 0.0, rcolors, { 255,255,255 }, dpi);
+    create_landmark_image(img_grid, dim_grid_fix, 0.0, rcolors, { 255,255,255 }, is_rot_45, dpi);
 
     // create image that will contain border and grid
     // fill it with border color
@@ -393,75 +391,4 @@ void BGRLandmark::create_checkerboard_image(
             img_grid.copyTo(rimg(roi));
         }
     }
-}
-
-
-
-void BGRLandmark::augment_landmark_image(
-    cv::Mat& rimg,
-    const int id,
-    const int num_dots,
-    const double dim_border,
-    const double padfac,
-    const cv::Scalar border_color,
-    const int dpi)
-{
-    // set limits on number of dots
-    if ((num_dots < 1) || (num_dots > 7))
-    {
-        ///////
-        return;
-        ///////
-    }
-
-    // convert ID to octal digit array which maps to the 8 dot colors
-    std::list<int> vec_octal;
-    int k = num_dots;
-    int id_temp = id;
-    while (k--)
-    {
-        vec_octal.push_front(id_temp % 8);
-        id_temp /= 8;
-    }
-
-    // set limits on size of border (0 inches to 1 inch)
-    double dim_border_fix = dim_border;
-    RAIL_MIN(dim_border_fix, 0.0);
-    RAIL_MAX(dim_border_fix, 1.0);
-
-    // set limits on radius padding factor
-    double padfac_fix = padfac;
-    RAIL_MAX(padfac_fix, 1.0);
-    RAIL_MIN(padfac_fix, 0.2);
-
-    // input is a landmark image with a border
-    const int kborder = static_cast<int>(dim_border_fix * dpi);
-    const int kdim = rimg.size().width;
-    const int kgrid = (kdim - (2 * kborder));
-    const int kstep = kgrid / num_dots;
-    
-    int krad = ((kgrid / static_cast<int>(num_dots)) / 2);
-    krad = static_cast<int>(padfac_fix * krad);
-
-    // make a new image that will hold landmark and colored dots
-    // there is additional border padding at the bottom
-    cv::Mat img;
-    img = cv::Mat::zeros({ kdim, kdim + kstep + kborder }, CV_8UC3);
-    cv::rectangle(img, { { 0, 0 }, img.size() }, border_color, -1);
-
-    // draw dots
-    int x = (kstep / 2) + kborder;
-    for (const auto& r : vec_octal)
-    {
-        cv::Point ctr = { x, kdim + (kstep / 2) };
-        cv::circle(img, ctr, krad, BGR_COLORS[r], -1, cv::LINE_AA);
-        x += kstep;
-    }
-
-    // draw landmark into new image
-    cv::Rect roi = cv::Rect({ 0, 0 }, rimg.size());
-    rimg.copyTo(img(roi));
-
-    // assign new image to input image
-    rimg = img;
 }

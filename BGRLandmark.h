@@ -73,12 +73,11 @@ public:
     void init(
         const int k = 11,
         const grid_colors_t& rcolors = PATTERN_0,
-        const int mode = cv::TM_CCOEFF);
+        const bool is_rot_45 = false);
 
     void perform_match(
         const cv::Mat& rsrc,
         cv::Mat& rtmatch,
-        std::vector<std::vector<cv::Point>>& rcontours,
         std::vector<cv::Point>& rpts);
 
     const cv::Size& get_template_offset(void) const { return tmpl_offset; }
@@ -93,6 +92,7 @@ public:
         const double dim_border = 0.25,
         const grid_colors_t& rcolors = PATTERN_0,
         const cv::Scalar border_color = BGR_BORDER,
+        const bool is_rot_45 = false,
         const int dpi = 96);
 
     // creates printable checkerboard by repeating a 2x2 landmark pattern
@@ -104,47 +104,27 @@ public:
         const double dim_border = 0.25,
         const grid_colors_t& rcolors = PATTERN_0,
         const cv::Scalar border_color = BGR_BORDER,
-        const int dpi = 96);
-
-    // converts ID to BGR dots and puts dots at bottom of printable 2x2 landmark image
-    static void augment_landmark_image(
-        cv::Mat& rimg,
-        const int id,
-        const int num_dots = 3,
-        const double dim_border = 0.25,
-        const double padfac = 0.75,
-        const cv::Scalar border_color = BGR_BORDER,
+        const bool is_rot_45 = false,
         const int dpi = 96);
 
 
 private:
     
-    // creates a 2x2 BGR template of pixel dimension k
+    // creates a 2x2 grid or "X" pattern BGR template of pixel dimension k
     static void create_template_image(
         cv::Mat& rimg,
         const int k,
-        const grid_colors_t& rcolors);
+        const grid_colors_t& rcolors,
+        const bool is_rot_45 = false);
 
 
 private:
 
-    // 2x2 grid or circular "X" pattern
-    bool is_grid_pattern;
-
-    // mode for matchTemplate
-    int mode;
-
-    // pattern for the 2x2 grid
+    // the 4-color pattern for the landmark
     grid_colors_t pattern;
 
     // threshold for match consideration
     double match_thr;
-
-    // score when matching template against itself
-    double ideal_score;
-    
-    // the 2x2 grid BGR template
-    cv::Mat tmpl_bgr;
 
     // the 2x2 grid hue template and mask
     cv::Mat tmpl_hue;

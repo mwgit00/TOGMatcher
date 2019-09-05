@@ -262,9 +262,8 @@ void loop2(void)
         }
 
         // look for landmarks
-        std::vector<std::vector<cv::Point>> qcontours;
         std::vector<cv::Point> qpts;
-        bgrm.perform_match(img_gray, tmatch, qcontours, qpts);
+        bgrm.perform_match(img_gray, tmatch, qpts);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
 
         // apply the current output mode
@@ -297,9 +296,13 @@ void loop2(void)
                 // display pre-processed input image
                 // show red overlay of any matches that exceed arbitrary threshold
                 Mat match_mask;
+                std::vector<std::vector<cv::Point>> contours;
                 const Size& tmpl_offset = bgrm.get_template_offset();
                 cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
-                drawContours(img_viewer, qcontours, -1, SCA_RED, 3, LINE_8, noArray(), INT_MAX, tmpl_offset);
+                normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
+                match_mask = (tmatch > MATCH_DISPLAY_THRESHOLD);
+                findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+                drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
                 break;
             }
             case Knobs::OUT_COLOR:
