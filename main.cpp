@@ -265,7 +265,14 @@ void loop2(void)
         std::vector<BGRLandmark::landmark_info_t> qinfo;
         bgrm.perform_match(img_gray, tmatch, qinfo);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
-        bgrm.check_grid_hues(img_viewer, ptmax);
+
+        if (qinfo.size())
+        {
+            for (const auto& r : qinfo)
+            {
+                bgrm.check_grid_hues(img_viewer, r);
+            }
+        }
 
         // apply the current output mode
         // content varies but all final output images are BGR

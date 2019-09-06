@@ -97,7 +97,12 @@ BGRLandmark::~BGRLandmark()
 
 
 
-void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const bool is_rot_45)
+void BGRLandmark::init(
+    const int k,
+    const grid_colors_t& rcolors,
+    const double match_thr_corr,
+    const double match_thr_hu,
+    const bool is_rot_45)
 {
     // fix k to be odd and in range 3-15
     int fixk = ((k / 2) * 2) + 1;
@@ -107,8 +112,9 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const bool is_
     // stash the color pattern
     pattern = rcolors;
     
-    // TODO -- add parameter for threshold
-    match_thr = 0.25;
+    // apply thresholds
+    this->match_thr_corr = match_thr_corr;
+    this->match_thr_hu = match_thr_hu;
 
     // create the templates
     // TODO -- do 90 degree rotation based on colors
@@ -117,13 +123,13 @@ void BGRLandmark::init(const int k, const grid_colors_t& rcolors, const bool is_
     
     cv::cvtColor(tmpl_bgr, tmpl_gray_p, cv::COLOR_BGR2GRAY);
     cv::rotate(tmpl_gray_p, tmpl_gray_n, cv::ROTATE_90_CLOCKWISE);
-    //imwrite("foogp.png", tmpl_gray_p);
-    //imwrite("foogn.png", tmpl_gray_n);
+    imwrite("foogp.png", tmpl_gray_p);
+    imwrite("foogn.png", tmpl_gray_n);
 
     // stash offset for this template
     const int fixkh = fixk / 2;
-    tmpl_offset.width = fixkh;
-    tmpl_offset.height = fixkh;
+    tmpl_offset.x = fixkh;
+    tmpl_offset.y = fixkh;
 }
 
 
@@ -144,7 +150,7 @@ void BGRLandmark::perform_match(
 
     // localize each landmark based on absolute threshold
     std::vector<std::vector<cv::Point>> contours;
-    cv::Mat match_masked = (rtmatch > 1.7);
+    cv::Mat match_masked = (rtmatch > match_thr_corr);
     findContours(match_masked, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 
     for (const auto& r : contours)
@@ -164,35 +170,59 @@ void BGRLandmark::perform_match(
         float pix_n = tmatch1.at<float>(pt);
         float diff = pix_p - pix_n;
 
-        // TODO -- apply hue test ???
+        // extract region of interest
+        const cv::Rect roi = cv::Rect(pt, tmpl_gray_p.size());
+        cv::Mat img_roi(rsrc(roi));
+
+        // determine mean and create binary threshold image
+        cv::Mat img_roi_thr;
+        double roi_avg = cv::mean(img_roi)[0];
+        cv::threshold(img_roi, img_roi_thr, roi_avg, 255, cv::THRESH_BINARY);
+
+        // use thresholded image to do a match against template with Hu moments
+        // it's rotationally invariant so one match against "p" template is sufficient
+        // match score is 0 to 1 with 0 being best so do subtraction from 1 to flip result
+        int msmode = cv::CONTOURS_MATCH_I3;
+        double msval = 1.0 - cv::matchShapes(img_roi_thr, tmpl_gray_p, msmode, 0.0);
+
+//        cv::imwrite("sample_gray.png", img_roi_thr);
+        if (msval > match_thr_hu)
         {
             // all is well so apply template offset and save it
-            rinfo.push_back({ { pt.x + tmpl_offset.width, pt.y + tmpl_offset.height }, diff });
+            rinfo.push_back({pt + tmpl_offset, diff, msval });
         }
     }
 }
 
 
 
-double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) const
+double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const BGRLandmark::landmark_info_t& rinfo) const
 {
     double result = 0.0;
 
-    // get region of interest around target point
-    // match has been done and template offset has already been applied so no need for it here
-    const cv::Rect roi = cv::Rect(rpt, tmpl_gray_n.size());
+    // get BGR region of interest around target point
+    // template offset has added so subtract it again
+    const cv::Point ctr_offset = rinfo.ctr - tmpl_offset;
+    const cv::Rect roi = cv::Rect(ctr_offset, tmpl_gray_p.size());
     
     // extract image from region of interest
-    // then convert and extract hue channel
     cv::Mat img_hls;
     cv::Mat img_channels[3];
     cv::Mat img_roi(rimg(roi));
+
+    // due median blur with size 1/3 of template size (forced to be odd)
+    int k = tmpl_gray_n.size().width / 3;
+    if ((k % 2) == 0) { k += 1; }
+    cv::Mat img_roi_blur;
+    cv::medianBlur(img_roi, img_roi_blur, k);
+
+    // then convert and extract hue channel
     cv::cvtColor(img_roi, img_hls, cv::COLOR_BGR2HLS);
     split(img_hls, img_channels);
 
     // ???
     
-    cv::imwrite("sample.png", img_roi);
+    //cv::imwrite("sample_bgr.png", img_roi_blur);
 
     return 0.0;
 }

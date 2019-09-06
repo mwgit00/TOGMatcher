@@ -32,8 +32,9 @@ public:
 
     typedef struct
     {
-        cv::Point ctr;
-        float diff;
+        cv::Point ctr;  // center point of landmark
+        double diff;    // value of positive template match minus negative template match
+        double msval;   // value of Hu Moment template match for ROI at center point
     } landmark_info_t;
 
     // names of colors with max and/or min BGR components
@@ -78,8 +79,10 @@ public:
 
     
     void init(
-        const int k = 11,
+        const int k = 15,
         const grid_colors_t& rcolors = PATTERN_A,
+        const double match_thr_corr = 1.7,
+        const double match_thr_hu = 0.98,
         const bool is_rot_45 = false);
 
     void perform_match(
@@ -89,7 +92,7 @@ public:
 
     const cv::Size& get_template_offset(void) const { return tmpl_offset; }
 
-    double check_grid_hues(const cv::Mat& rimg, const cv::Point& rpt) const;
+    double check_grid_hues(const cv::Mat& rimg, const BGRLandmark::landmark_info_t& rinfo) const;
 
     
     // creates printable 2x2 landmark image
@@ -131,14 +134,15 @@ private:
     grid_colors_t pattern;
 
     // threshold for match consideration
-    double match_thr;
+    double match_thr_corr;
+    double match_thr_hu;
 
     // templates for 2x2 checkerboard grid
     cv::Mat tmpl_gray_p;
     cv::Mat tmpl_gray_n;
 
     // offset for centering template location
-    cv::Size tmpl_offset;
+    cv::Point tmpl_offset;
 };
 
 #endif // BGR_LANDMARK_
