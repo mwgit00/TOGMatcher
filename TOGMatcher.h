@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2018 Mark Whitney
+// Copyright(c) 2019 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -58,6 +58,12 @@ public:
         cv::Mat& rtmatch,
         const bool is_mask_enabled = true,
         const int ksize = TOG_DEFAULT_KSIZE);
+
+    void TOGMatcher::perform_match_sqdiff(
+        const cv::Mat& rsrc,
+        cv::Mat& rtmatch,
+        const bool is_mask_enabled,
+        const int ksize);
 
     const cv::Mat& get_template_mask(void) const { return tmpl_mask_32F; }
     const cv::Mat& get_template_dx(void) const { return tmpl_dx; }

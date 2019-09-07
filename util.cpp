@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2018 Mark Whitney
+// Copyright(c) 2019 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -23,6 +23,9 @@
 #include "Windows.h"
 
 #include "opencv2/highgui.hpp"
+#include "opencv2/imgproc.hpp"
+#include "opencv2/imgcodecs.hpp"
+
 
 #include <list>
 #include <iostream>
@@ -62,7 +65,8 @@ bool make_video(
     const std::string& rspath,
     const std::string& rsname,
     const int iFOURCC,
-    const std::list<std::string>& rListOfPNG)
+    const std::list<std::string>& rListOfPNG,
+    const double img_scale)
 {
     bool result = false;
     
@@ -72,17 +76,25 @@ bool make_video(
     cv::Mat img = cv::imread(rs);
     cv::Size img_sz = img.size();
 
+    // determine size of rescaled image for making the movie
+    cv::Mat img_viewer;
+    cv::Size viewer_size = cv::Size(
+        static_cast<int>(img_sz.width * img_scale),
+        static_cast<int>(img_sz.height * img_scale));
+
     std::string sname = rspath + "\\" + rsname;
 
     // build movie from separate frames
-    cv::VideoWriter vw = cv::VideoWriter(sname, iFOURCC, fps, img_sz);
+    cv::VideoWriter vw = cv::VideoWriter(sname, iFOURCC, fps, viewer_size);
 
     if (vw.isOpened())
     {
         for (const auto& r : rListOfPNG)
         {
             cv::Mat img = cv::imread(r);
-            vw.write(img);
+            cv::Mat img_viewer;
+            cv::resize(img, img_viewer, viewer_size);
+            vw.write(img_viewer);
         }
         
         result = true;

@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2018 Mark Whitney
+// Copyright(c) 2019 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -58,6 +58,7 @@ void Knobs::show_help(void) const
     std::cout << "2   Use Green channel" << std::endl;
     std::cout << "3   Use Red channel" << std::endl;
     std::cout << "4   Use all channels in grayscale image" << std::endl;
+    std::cout << "7   Output best matches on color image" << std::endl;
     std::cout << "8   Output raw template match result " << std::endl;
     std::cout << "9   Output masked match result on pre-processed gray image" << std::endl;
     std::cout << "0   Output best match result on color image" << std::endl;

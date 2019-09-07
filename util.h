@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2018 Mark Whitney
+// Copyright(c) 2019 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -29,6 +29,7 @@
 typedef struct
 {
     double mag_thr;
+    double img_scale;
     std::string sname;
 } T_file_info;
 
@@ -44,13 +45,14 @@ void get_dir_list(
 // "movie.avi", CV_FOURCC('M', 'J', 'P', 'G')
 // "movie.avi", CV_FOURCC('M', 'P', '4', '2')
 // "movie.avi", CV_FOURCC('M', 'P', '4', 'V')  -- error messages but VLC can play it
-// "movie.mov", CV_FOURCC('M', 'P', '4', 'V')  -- error messages but VLC can play it, iMovie can import it
+// "movie.mov", CV_FOURCC('m', 'p', '4', 'v')  -- VLC can play it, iMovie can import it
 // "movie.mov", CV_FOURCC('M', 'J', 'P', 'G')  -- error messages but VLC can play it, iMovie can import it
 bool make_video(
     const double fps,
     const std::string& rspath,
     const std::string& rsname,
     const int iFOURCC,
-    const std::list<std::string>& rListOfPNG);
+    const std::list<std::string>& rListOfPNG,
+    const double img_scale = 1.0);
 
 #endif // UTIL_H_

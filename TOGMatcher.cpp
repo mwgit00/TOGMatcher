@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2018 Mark Whitney
+// Copyright(c) 2019 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -132,4 +132,38 @@ void TOGMatcher::perform_match(
 
     // combine results by multiplying both matches together
     rtmatch = tmatch_x.mul(tmatch_y);
+}
+
+
+void TOGMatcher::perform_match_sqdiff(
+    const cv::Mat& rsrc,
+    cv::Mat& rtmatch,
+    const bool is_mask_enabled,
+    const int ksize)
+{
+    cv::Mat grad_x;
+    cv::Mat grad_y;
+    cv::Mat tmatch_x;
+    cv::Mat tmatch_y;
+
+    // calculate X and Y gradient images
+    Sobel(rsrc, grad_x, TEMPLATE_DEPTH, 1, 0, ksize);
+    Sobel(rsrc, grad_y, TEMPLATE_DEPTH, 0, 1, ksize);
+
+    // perform match with dX and dY magnitude templates
+    // it is up to the user whether or not the mask is enabled
+    if (is_mask_enabled)
+    {
+        matchTemplate(grad_x, tmpl_dx, tmatch_x, cv::TM_SQDIFF, tmpl_mask_32F);
+        matchTemplate(grad_y, tmpl_dy, tmatch_y, cv::TM_SQDIFF, tmpl_mask_32F);
+    }
+    else
+    {
+        matchTemplate(grad_x, tmpl_dx, tmatch_x, cv::TM_SQDIFF);
+        matchTemplate(grad_y, tmpl_dy, tmatch_y, cv::TM_SQDIFF);
+    }
+
+    // combine results by adding match results
+    // best results for SQDIFF are minimums so do a sign flip
+    rtmatch = -(tmatch_x + tmatch_y);
 }

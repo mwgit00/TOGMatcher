@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2018 Mark Whitney
+// Copyright(c) 2019 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -65,14 +65,13 @@ int n_record_ctr = 0;
 
 const std::vector<T_file_info> vfiles =
 {
-    { 0.50, "dbg_tmpl_gray_p.png" },
-    { 0.00, "circle_b_on_w.png"},
-    { 0.00, "bottle_20perc_top_b_on_w.png"},
-    { 0.00, "bottle_20perc_curve_b_on_w.png"},
-    { 0.20, "outlet_cover.png"},
-    { 0.20, "outlet_holes.png" },
-    { 0.50, "panda_face.png"},
-    { 0.00, "stars_main.png"}
+    { 0.00, 1.0, "circle_b_on_w.png"},
+    { 0.00, 1.0, "bottle_20perc_top_b_on_w.png"},
+    { 0.00, 1.0, "bottle_20perc_curve_b_on_w.png"},
+    { 0.20, 1.0, "outlet_cover.png"},
+    { 0.20, 1.0, "outlet_holes.png" },
+    { 0.50, 1.0, "panda_face.png"},
+    { 0.00, 1.0, "stars_main.png"}
 };
 
 size_t nfile = 0U;
@@ -131,20 +130,20 @@ void image_output(
         {
             Rect roi = Rect(rptmax, rptmax + (roffset * 2));
             rectangle(rimg, roi, SCA_GREEN, 1);
-            circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
+            //circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
             break;
         }
         case max_mode_t::CIRCLE:
         {
             circle(rimg, ptcenter, 15, SCA_GREEN, 2);
-            circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
+            //circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
             break;
         }
         case max_mode_t::CONTOUR:
         {
             // draw contours of best match with a yellow dot in the center
             drawContours(rimg, rcontours, -1, SCA_GREEN, 2, LINE_8, noArray(), INT_MAX, rptmax);
-            circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
+            //circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
             break;
         }
         case max_mode_t::NONE:
@@ -574,6 +573,6 @@ void loop(void)
 
 int main(int argc, char** argv)
 {
-    loop2();
+    loop();
     return 0;
 }
