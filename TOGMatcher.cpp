@@ -97,8 +97,8 @@ void TOGMatcher::create_templates(const cv::Mat& rsrc, const int ksize, const do
     cv::findContours(temp_mask, src_contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 
     tmpl_offset = temp_mask.size();
-    tmpl_offset.width /= 2;
-    tmpl_offset.height /= 2;
+    tmpl_offset.x /= 2;
+    tmpl_offset.y /= 2;
 }
 
 

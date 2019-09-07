@@ -63,7 +63,7 @@ public:
     const cv::Mat& get_template_dx(void) const { return tmpl_dx; }
     const cv::Mat& get_template_dy(void) const { return tmpl_dy; }
     const std::vector<std::vector<cv::Point>>& get_contours() { return src_contours; }
-    const cv::Size& get_template_offset(void) const { return tmpl_offset; }
+    const cv::Point& get_template_offset(void) const { return tmpl_offset; }
 
 private:
 
@@ -82,7 +82,7 @@ private:
     cv::Mat tmpl_dy;
 
     // Offset for centering template location
-    cv::Size tmpl_offset;
+    cv::Point tmpl_offset;
 
     // Contour(s) of template that can be drawn onto an image
     std::vector<std::vector<cv::Point>> src_contours;

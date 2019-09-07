@@ -50,12 +50,22 @@ using namespace cv;
 #define SCA_BLUE    (cv::Scalar(255,0,0))
 
 
+
+enum class max_mode_t : int
+{
+    NONE = 0,
+    RECT,
+    CIRCLE,
+    CONTOUR,
+};
+
 const char * stitle = "TOGMatcher";
 int n_record_ctr = 0;
 
 
 const std::vector<T_file_info> vfiles =
 {
+    { 0.50, "dbg_tmpl_gray_p.png" },
     { 0.00, "circle_b_on_w.png"},
     { 0.00, "bottle_20perc_top_b_on_w.png"},
     { 0.00, "bottle_20perc_curve_b_on_w.png"},
@@ -100,9 +110,11 @@ void image_output(
     const double qmax,
     const Point& rptmax,
     const Knobs& rknobs,
-    const cv::Size& roffset)
+    const cv::Point& roffset,
+    const std::vector<std::vector<cv::Point>>& rcontours,
+    const max_mode_t max_mode = max_mode_t::NONE)
 {
-    Size ptcenter = { rptmax.x + roffset.width, rptmax.y + roffset.height };
+    Size ptcenter = rptmax + roffset;
 
     // format score string for viewer (#.##)
     std::ostringstream oss;
@@ -113,12 +125,34 @@ void image_output(
     rectangle(rimg, { 0,0,40,16 }, SCA_BLACK, -1);
     putText(rimg, oss.str(), { 0,12 }, FONT_HERSHEY_PLAIN, 1.0, SCA_GREEN, 1);
 
-#if 0
-    // draw contours of best match with a yellow dot in the center
-    drawContours(rimg, rmatcher.get_contours(), -1, SCA_GREEN, 2, LINE_8, noArray(), INT_MAX, rptmax);
-#endif
-    circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
-    circle(rimg, ptcenter, 15, SCA_GREEN, 2);
+    switch (max_mode)
+    {
+        case max_mode_t::RECT:
+        {
+            Rect roi = Rect(rptmax, rptmax + (roffset * 2));
+            rectangle(rimg, roi, SCA_GREEN, 1);
+            circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
+            break;
+        }
+        case max_mode_t::CIRCLE:
+        {
+            circle(rimg, ptcenter, 15, SCA_GREEN, 2);
+            circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
+            break;
+        }
+        case max_mode_t::CONTOUR:
+        {
+            // draw contours of best match with a yellow dot in the center
+            drawContours(rimg, rcontours, -1, SCA_GREEN, 2, LINE_8, noArray(), INT_MAX, rptmax);
+            circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
+            break;
+        }
+        case max_mode_t::NONE:
+        default:
+        {
+            break;
+        }
+    }
     
     // save each frame to a file if recording
     if (rknobs.get_record_enabled())
@@ -261,6 +295,13 @@ void loop2(void)
             pCLAHE->apply(img_gray, img_gray);
         }
 
+        // apply the current blur setting
+        int kblur = theKnobs.get_pre_blur();
+        if (kblur >= 3)
+        {
+            GaussianBlur(img_gray, img_gray, { kblur, kblur }, 0, 0);
+        }
+
         // look for landmarks
         std::vector<BGRLandmark::landmark_info_t> qinfo;
         bgrm.perform_match(img_gray, tmatch, qinfo);
@@ -276,6 +317,7 @@ void loop2(void)
 
         // apply the current output mode
         // content varies but all final output images are BGR
+        max_mode_t max_mode = max_mode_t::NONE;
         switch (theKnobs.get_output_mode())
         {
             case Knobs::OUT_AUX:
@@ -291,12 +333,13 @@ void loop2(void)
             {
                 // show the raw template match result
                 // it is shifted and placed on top of blank image of original input size
-                const Size& tmpl_offset = bgrm.get_template_offset();
+                const Point& tmpl_offset = bgrm.get_template_offset();
                 Mat full_tmatch = Mat::zeros(img_viewer.size(), CV_32F);
-                Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, tmatch.cols, tmatch.rows);
+                Rect roi = Rect(tmpl_offset, tmatch.size());
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 tmatch.copyTo(full_tmatch(roi));
                 cvtColor(full_tmatch, img_viewer, COLOR_GRAY2BGR);
+                max_mode = max_mode_t::RECT;
                 break;
             }
             case Knobs::OUT_MASK:
@@ -305,24 +348,26 @@ void loop2(void)
                 // show red overlay of any matches that exceed arbitrary threshold
                 Mat match_mask;
                 std::vector<std::vector<cv::Point>> contours;
-                const Size& tmpl_offset = bgrm.get_template_offset();
+                const Point& tmpl_offset = bgrm.get_template_offset();
                 cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 match_mask = (tmatch > MATCH_DISPLAY_THRESHOLD);
                 findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
                 drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
+                max_mode = max_mode_t::RECT;
                 break;
             }
             case Knobs::OUT_COLOR:
             default:
             {
                 // no extra output processing
+                max_mode = max_mode_t::RECT;
                 break;
             }
         }
 
         // always show best match contour and target dot on BGR image
-        image_output(img_viewer, qmax, ptmax, theKnobs, bgrm.get_template_offset());
+        image_output(img_viewer, qmax, ptmax, theKnobs, bgrm.get_template_offset(), {}, max_mode);
 
         // handle keyboard events and end when ESC is pressed
         is_running = wait_and_check_keys(theKnobs);
@@ -330,7 +375,7 @@ void loop2(void)
 
     // when everything is done, release the capture device and windows
     vcap.release();
-    destroyAllWindows();
+    cv::destroyAllWindows();
 }
 
 
@@ -464,18 +509,24 @@ void loop(void)
 
         // apply the current output mode
         // content varies but all final output images are BGR
+        max_mode_t max_mode = max_mode_t::NONE;
         switch (theKnobs.get_output_mode())
         {
+            case Knobs::OUT_AUX:
+            {
+                max_mode = max_mode_t::RECT;
+                break;
+            }
             case Knobs::OUT_RAW:
             {
                 // show the raw template match result
                 // it is shifted and placed on top of blank image of original input size
-                const Size& tmpl_offset = togm.get_template_offset();
                 Mat full_tmatch = Mat::zeros(img_gray.size(), CV_32F);
-                Rect roi = Rect(tmpl_offset.width, tmpl_offset.height, tmatch.cols, tmatch.rows);
+                Rect roi = Rect(togm.get_template_offset(), tmatch.size());
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 tmatch.copyTo(full_tmatch(roi));
                 cvtColor(full_tmatch, img_viewer, COLOR_GRAY2BGR);
+                max_mode = max_mode_t::RECT;
                 break;
             }
             case Knobs::OUT_MASK:
@@ -484,24 +535,32 @@ void loop(void)
                 // show red overlay of any matches that exceed arbitrary threshold
                 Mat match_mask;
                 std::vector<std::vector<cv::Point>> contours;
-                const Size& tmpl_offset = togm.get_template_offset();
+                const Point& tmpl_offset = togm.get_template_offset();
                 cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
                 match_mask = (tmatch > MATCH_DISPLAY_THRESHOLD);
                 findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
                 drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
+                max_mode = max_mode_t::RECT;
                 break;
             }
             case Knobs::OUT_COLOR:
             default:
             {
-                // no extra output processing
+                max_mode = max_mode_t::CONTOUR;
                 break;
             }
         }
 
-        // always show best match contour and target dot on BGR image
-        image_output(img_viewer, qmax, ptmax, theKnobs, togm.get_template_offset());
+        // update display based on options and mode
+        image_output(
+            img_viewer,
+            qmax,
+            ptmax,
+            theKnobs,
+            togm.get_template_offset(),
+            togm.get_contours(),
+            max_mode);
 
         // handle keyboard events and end when ESC is pressed
         is_running = wait_and_check_keys(theKnobs);
@@ -509,7 +568,7 @@ void loop(void)
 
     // when everything is done, release the capture device and windows
     vcap.release();
-    destroyAllWindows();
+    cv::destroyAllWindows();
 }
 
 

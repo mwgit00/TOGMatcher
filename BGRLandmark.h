@@ -24,6 +24,7 @@
 #define BGR_LANDMARK_
 
 #include "opencv2/imgproc.hpp"
+#include "TOGMatcher.h"
 
 
 class BGRLandmark
@@ -79,10 +80,10 @@ public:
 
     
     void init(
-        const int k = 15,
+        const int k = 11,
         const grid_colors_t& rcolors = PATTERN_A,
         const double match_thr_corr = 1.7,
-        const double match_thr_hu = 0.98,
+        const double match_thr_hu = 0.94,
         const bool is_rot_45 = false);
 
     void perform_match(
@@ -90,7 +91,7 @@ public:
         cv::Mat& rtmatch,
         std::vector<BGRLandmark::landmark_info_t>& rpts);
 
-    const cv::Size& get_template_offset(void) const { return tmpl_offset; }
+    const cv::Point& get_template_offset(void) const { return tmpl_offset; }
 
     double check_grid_hues(const cv::Mat& rimg, const BGRLandmark::landmark_info_t& rinfo) const;
 

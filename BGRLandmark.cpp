@@ -120,11 +120,13 @@ void BGRLandmark::init(
     // TODO -- do 90 degree rotation based on colors
     cv::Mat tmpl_bgr;
     create_template_image(tmpl_bgr, fixk, PATTERN_0, is_rot_45);
-    
+
     cv::cvtColor(tmpl_bgr, tmpl_gray_p, cv::COLOR_BGR2GRAY);
     cv::rotate(tmpl_gray_p, tmpl_gray_n, cv::ROTATE_90_CLOCKWISE);
-    imwrite("foogp.png", tmpl_gray_p);
-    imwrite("foogn.png", tmpl_gray_n);
+#ifdef _DEBUG
+    imwrite("dbg_tmpl_gray_p.png", tmpl_gray_p);
+    imwrite("dbg_tmpl_gray_n.png", tmpl_gray_n);
+#endif
 
     // stash offset for this template
     const int fixkh = fixk / 2;
@@ -163,6 +165,10 @@ void BGRLandmark::perform_match(
         {
             pt = cv::Point((mm.m10 / mm.m00), (mm.m01 / mm.m00));
         }
+        else
+        {
+            continue;
+        }
 
         // positive diff means black in upper-left/lower-right
         // negative diff means black in lower-left/upper-right
@@ -174,18 +180,19 @@ void BGRLandmark::perform_match(
         const cv::Rect roi = cv::Rect(pt, tmpl_gray_p.size());
         cv::Mat img_roi(rsrc(roi));
 
-        // determine mean and create binary threshold image
-        cv::Mat img_roi_thr;
-        double roi_avg = cv::mean(img_roi)[0];
-        cv::threshold(img_roi, img_roi_thr, roi_avg, 255, cv::THRESH_BINARY);
+        // apply equalization to get full range on light and dark regions
+        cv::Mat img_roi_proc;
+        cv::equalizeHist(img_roi, img_roi_proc);
 
-        // use thresholded image to do a match against template with Hu moments
+        // use equalized image to do a match against template with Hu moments
         // it's rotationally invariant so one match against "p" template is sufficient
         // match score is 0 to 1 with 0 being best so do subtraction from 1 to flip result
         int msmode = cv::CONTOURS_MATCH_I3;
-        double msval = 1.0 - cv::matchShapes(img_roi_thr, tmpl_gray_p, msmode, 0.0);
+        double msval = 1.0 - cv::matchShapes(img_roi_proc, tmpl_gray_p, msmode, 0.0);
 
-//        cv::imwrite("sample_gray.png", img_roi_thr);
+#ifdef _DEBUG
+        cv::imwrite("dbg_sample_gray.png", img_roi_proc);
+#endif
         if (msval > match_thr_hu)
         {
             // all is well so apply template offset and save it
@@ -276,8 +283,9 @@ void BGRLandmark::create_template_image(
         cv::Mat rot = cv::getRotationMatrix2D(fctr, 45.0, 1.42);
         cv::warpAffine(rimg, rimg, rot, rimg.size());
     }
-
-    //cv::imwrite("foobgr.png", rimg);
+#ifdef _DEBUG
+    cv::imwrite("dbg_tmpl_bgr.png", rimg);
+#endif
 }
 
 
