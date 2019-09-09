@@ -36,6 +36,7 @@ public:
         cv::Point ctr;  // center point of landmark
         double diff;    // value of positive template match minus negative template match
         double rng;     // difference between max and min in ROI
+        int run_ct[4];  // length of "runs" for dark-light regions going around border of ROI
     } landmark_info_t;
 
     // names of colors with max and/or min BGR components
@@ -80,7 +81,7 @@ public:
 
     
     void init(
-        const int k = 13,
+        const int k = 11,
         const grid_colors_t& rcolors = PATTERN_A,
         const double match_thr_corr = 0.8,
         const double match_thr_rng = 85.0,
@@ -136,7 +137,8 @@ private:
 
     // threshold for match consideration
     double match_thr_corr;
-    int match_thr_rng;
+    double match_thr_rng;
+    double match_thr_min;
 
     // templates for 2x2 checkerboard grid
     cv::Mat tmpl_gray_p;
@@ -145,7 +147,9 @@ private:
     // offset for centering template location
     cv::Point tmpl_offset;
 
+    // contour and mask for checking landmark candidate
     std::vector<cv::Point> vec_test_points;
+    cv::Mat mask_test_points;
 };
 
 #endif // BGR_LANDMARK_

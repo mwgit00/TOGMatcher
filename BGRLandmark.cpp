@@ -106,7 +106,7 @@ void BGRLandmark::init(
 {
     // fix k to be odd and in range 3-15
     int fixk = ((k / 2) * 2) + 1;
-    RAIL_MIN(fixk, 3);
+    RAIL_MIN(fixk, 9);
     RAIL_MAX(fixk, 15);
     
     // stash the color pattern
@@ -115,6 +115,7 @@ void BGRLandmark::init(
     // apply thresholds
     this->match_thr_corr = match_thr_corr;
     this->match_thr_rng = match_thr_rng;
+    this->match_thr_min = 85.0; // dark landmark regions should be below 1/3 of max 255 pixel value
 
     // create the templates
     // TODO -- do 90 degree rotation based on colors
@@ -133,13 +134,17 @@ void BGRLandmark::init(
     tmpl_offset.x = fixkh;
     tmpl_offset.y = fixkh;
 
-    // create an array of points in a circle
-    // these points will be sampled in a landmark candidate
-    cv::Mat img_circ = cv::Mat::zeros(tmpl_gray_p.size(), CV_8UC1);
-    cv::circle(img_circ, tmpl_offset, tmpl_offset.x, 255, 1);
-    std::vector<std::vector<cv::Point>> contour_circ;
-    cv::findContours(img_circ, contour_circ, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-    vec_test_points = contour_circ[0];
+    // create an array of points that cycle around a ROI
+    // these points will be sampled for a landmark candidate
+    mask_test_points = cv::Mat::zeros(tmpl_gray_p.size(), CV_8UC1);
+    //cv::cycle(img_cyc, tmpl_offset, tmpl_offset.x, 255, 1);
+    cv::rectangle(mask_test_points, { cv::Point(0, 0), cv::Point(fixk, fixk) }, 255, 1);
+#ifdef _DEBUG
+    imwrite("dbg_cyc_pts.png", mask_test_points);
+#endif
+    std::vector<std::vector<cv::Point>> contour_cyc;
+    cv::findContours(mask_test_points, contour_cyc, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+    vec_test_points = contour_cyc[0];
 }
 
 
@@ -193,34 +198,79 @@ void BGRLandmark::perform_match(
         const cv::Rect roi = cv::Rect(pt, tmpl_gray_p.size());
         cv::Mat img_roi(rsrc(roi));
 
-        // see if region has lots of contrast
-        double min;
-        double max;
-        cv::minMaxLoc(img_roi, &min, &max);
-        double rng = max - min;
-        double avg = cv::mean(img_roi)[0];
+        // see if ROI has large range in pixel values and minimum is sufficiently dark
+        // a good candidate will have well-defined light and dark regions
+        double min_roi;
+        double max_roi;
+        cv::minMaxLoc(img_roi, &min_roi, &max_roi);
+        double rng_roi = max_roi - min_roi;
 
-        // suppress as much noise as possible in ROI
-        cv::Mat img_roi_proc;
-        cv::bilateralFilter(img_roi, img_roi_proc, 3, 150, 150);
-
-        // follow a path around outer edge of the ROI and see
-        // if pixel intensity varies like it would around a checkerboard corner
-        std::vector<uint8_t> xxxv;
-        for (const auto& rcpt : vec_test_points)
+        if ((rng_roi > match_thr_rng) && (min_roi < match_thr_min))
         {
-            xxxv.push_back(img_roi_proc.at<uint8_t>(rcpt));
-        }
+            // make a placeholder of info for the potential landmark
+            landmark_info_t lminfo{ pt + tmpl_offset, diff, rng_roi, { 0 } };
+
+            // use bilateral filter to suppress as much noise as possible in ROI
+            // while also preserving sharp edges
+            cv::Mat img_roi_proc;
+            cv::bilateralFilter(img_roi, img_roi_proc, 3, 200, 200);
+
+            // gather stats for path around outer edge of the ROI
+            // 2 dark regions should be below min_thr, both at similar level, so use a "hard" threshold
+            // 2 light regions should be above med_thr, possibly slightly different levels for each
+            // light regions will need an "easier" threshold since they can vary
+            double max;
+            double min;
+            cv::minMaxLoc(img_roi_proc, &min, &max, nullptr, nullptr, mask_test_points);
+            double rng_filt = max - min;
+            uint8_t min_thr = static_cast<uint8_t>(min + (0.1 * rng_filt));
+            uint8_t med_thr = static_cast<uint8_t>(min + (0.6 * rng_filt));
+
+            // see if pixel intensity has roughly symmetrical alternating light-dark pattern
+            // like it would around a checkerboard corner
+            // first light-dark detection will k index back to 0
+            int k = 3;
+            int prev_comp = 0;
+            for (size_t i = 0; i < vec_test_points.size(); i++)
+            {
+                uint8_t pix = img_roi_proc.at<uint8_t>(vec_test_points[i]);
+                if (pix < min_thr)
+                {
+                    // dark region
+                    if (prev_comp >= 0)
+                    {
+                        // previous was light or undetermined region so roll index
+                        k = (k + 1) % 4;
+                    }
+                    prev_comp = -1;
+                    lminfo.run_ct[k]++;
+                }
+                else if (pix > med_thr)
+                {
+                    // light region
+                    if (prev_comp <= 0)
+                    {
+                        // previous was dark or undetermined region so roll index
+                        k = (k + 1) % 4;
+                    }
+                    prev_comp = 1;
+                    lminfo.run_ct[k]++;
+                }
+                else
+                {
+                    // undetermined region
+                    prev_comp = 0;
+                }
+            }
+
+            // TODO -- check run_ct array for sane values
 
 #ifdef _DEBUG
         cv::imwrite("dbg_sample_gray.png", img_roi_proc);
-        //cv::imwrite("dbg_sample_foo.png", xxx);
 #endif
-        if (rng > match_thr_rng)
-        {
             
             // all is well so apply template offset and save it
-            rinfo.push_back({pt + tmpl_offset, diff, rng });
+            rinfo.push_back(lminfo);
         }
     }
 }
