@@ -101,7 +101,7 @@ void BGRLandmark::init(
     const int k,
     const grid_colors_t& rcolors,
     const double match_thr_corr,
-    const double match_thr_hu,
+    const double match_thr_rng,
     const bool is_rot_45)
 {
     // fix k to be odd and in range 3-15
@@ -114,7 +114,7 @@ void BGRLandmark::init(
     
     // apply thresholds
     this->match_thr_corr = match_thr_corr;
-    this->match_thr_hu = match_thr_hu;
+    this->match_thr_rng = match_thr_rng;
 
     // create the templates
     // TODO -- do 90 degree rotation based on colors
@@ -132,6 +132,14 @@ void BGRLandmark::init(
     const int fixkh = fixk / 2;
     tmpl_offset.x = fixkh;
     tmpl_offset.y = fixkh;
+
+    // create an array of points in a circle
+    // these points will be sampled in a landmark candidate
+    cv::Mat img_circ = cv::Mat::zeros(tmpl_gray_p.size(), CV_8UC1);
+    cv::circle(img_circ, tmpl_offset, tmpl_offset.x, 255, 1);
+    std::vector<std::vector<cv::Point>> contour_circ;
+    cv::findContours(img_circ, contour_circ, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+    vec_test_points = contour_circ[0];
 }
 
 
@@ -152,7 +160,7 @@ void BGRLandmark::perform_match(
 
     // localize each landmark based on absolute threshold
     std::vector<std::vector<cv::Point>> contours;
-    cv::Mat match_masked = (rtmatch > match_thr_corr);
+    cv::Mat match_masked = (rtmatch > (2.0 * match_thr_corr));
     findContours(match_masked, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 
     for (const auto& r : contours)
@@ -160,14 +168,19 @@ void BGRLandmark::perform_match(
         // find centroid associated with each landmark
         // note that contour could be a single point or have area 0
         cv::Moments mm = cv::moments(r, true);
-        cv::Point pt = r[0];
+        cv::Point pt;
         if (mm.m00 > 0.0)
         {
             pt = cv::Point((mm.m10 / mm.m00), (mm.m01 / mm.m00));
         }
         else
         {
-            continue;
+            pt = { 0,0 };
+            for (const auto& rpt : r)
+            {
+                pt += rpt;
+            }
+            pt *= (1.0 / r.size());
         }
 
         // positive diff means black in upper-left/lower-right
@@ -180,23 +193,34 @@ void BGRLandmark::perform_match(
         const cv::Rect roi = cv::Rect(pt, tmpl_gray_p.size());
         cv::Mat img_roi(rsrc(roi));
 
-        // apply equalization to get full range on light and dark regions
-        cv::Mat img_roi_proc;
-        cv::equalizeHist(img_roi, img_roi_proc);
+        // see if region has lots of contrast
+        double min;
+        double max;
+        cv::minMaxLoc(img_roi, &min, &max);
+        double rng = max - min;
+        double avg = cv::mean(img_roi)[0];
 
-        // use equalized image to do a match against template with Hu moments
-        // it's rotationally invariant so one match against "p" template is sufficient
-        // match score is 0 to 1 with 0 being best so do subtraction from 1 to flip result
-        int msmode = cv::CONTOURS_MATCH_I3;
-        double msval = 1.0 - cv::matchShapes(img_roi_proc, tmpl_gray_p, msmode, 0.0);
+        // suppress as much noise as possible in ROI
+        cv::Mat img_roi_proc;
+        cv::bilateralFilter(img_roi, img_roi_proc, 3, 150, 150);
+
+        // follow a path around outer edge of the ROI and see
+        // if pixel intensity varies like it would around a checkerboard corner
+        std::vector<uint8_t> xxxv;
+        for (const auto& rcpt : vec_test_points)
+        {
+            xxxv.push_back(img_roi_proc.at<uint8_t>(rcpt));
+        }
 
 #ifdef _DEBUG
         cv::imwrite("dbg_sample_gray.png", img_roi_proc);
+        //cv::imwrite("dbg_sample_foo.png", xxx);
 #endif
-        if (msval > match_thr_hu)
+        if (rng > match_thr_rng)
         {
+            
             // all is well so apply template offset and save it
-            rinfo.push_back({pt + tmpl_offset, diff, msval });
+            rinfo.push_back({pt + tmpl_offset, diff, rng });
         }
     }
 }

@@ -573,6 +573,6 @@ void loop(void)
 
 int main(int argc, char** argv)
 {
-    loop();
+    loop2();
     return 0;
 }
