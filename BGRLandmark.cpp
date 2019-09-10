@@ -99,23 +99,23 @@ BGRLandmark::~BGRLandmark()
 
 void BGRLandmark::init(
     const int k,
-    const grid_colors_t& rcolors,
     const double match_thr_corr,
     const double match_thr_rng,
+    const double match_thr_min,
+    const double match_thr_sym,
     const bool is_rot_45)
 {
-    // fix k to be odd and in range 3-15
+    // fix k to be odd and in range 9-15
     int fixk = ((k / 2) * 2) + 1;
     RAIL_MIN(fixk, 9);
     RAIL_MAX(fixk, 15);
     
-    // stash the color pattern
-    pattern = rcolors;
-    
     // apply thresholds
+    // TODO -- this currently is hard-coded for CV_8U, maybe that type should be asserted
     this->match_thr_corr = match_thr_corr;
-    this->match_thr_rng = match_thr_rng;
-    this->match_thr_min = 85.0; // dark landmark regions should be below 1/3 of max 255 pixel value
+    this->match_thr_rng = match_thr_rng * 255.0;
+    this->match_thr_min = match_thr_min * 255.0;
+    this->match_thr_sym = match_thr_sym;
 
     // create the templates
     // TODO -- do 90 degree rotation based on colors
@@ -156,59 +156,53 @@ void BGRLandmark::perform_match(
 {
     const int xmode = cv::TM_CCOEFF_NORMED;
 
+    // match the positive and negative templates
+    // and find absolute difference between the two results
     cv::Mat tmatch0;
     cv::Mat tmatch1;
     matchTemplate(rsrc, tmpl_gray_p, tmatch0, xmode);
     matchTemplate(rsrc, tmpl_gray_n, tmatch1, xmode);
-    rtmatch = (tmatch0 - tmatch1);
-    rtmatch = abs(rtmatch);
+    rtmatch = abs(tmatch0 - tmatch1);
 
-    // localize each landmark based on absolute threshold
+    // find local maxima in the match results...
+    cv::Mat maxima_mask;
+    cv::dilate(rtmatch, maxima_mask, cv::Mat());
+    cv::compare(rtmatch, maxima_mask, maxima_mask, cv::CMP_GE);
+
+    // then apply absolute threshold to get the best local maxima
     std::vector<std::vector<cv::Point>> contours;
-    cv::Mat match_masked = (rtmatch > (2.0 * match_thr_corr));
-    findContours(match_masked, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+    cv::Mat match_masked = (rtmatch > match_thr_corr);
+    maxima_mask = maxima_mask & match_masked;
 
-    for (const auto& r : contours)
+    // collect point locations of all local maxima
+    std::vector<cv::Point> vec_maxima_pts;
+    cv::findNonZero(maxima_mask, vec_maxima_pts);
+
+    // check each maxima...
+    for (const auto& rpt : vec_maxima_pts)
     {
-        // find centroid associated with each landmark
-        // note that contour could be a single point or have area 0
-        cv::Moments mm = cv::moments(r, true);
-        cv::Point pt;
-        if (mm.m00 > 0.0)
-        {
-            pt = cv::Point((mm.m10 / mm.m00), (mm.m01 / mm.m00));
-        }
-        else
-        {
-            pt = { 0,0 };
-            for (const auto& rpt : r)
-            {
-                pt += rpt;
-            }
-            pt *= (1.0 / r.size());
-        }
-
         // positive diff means black in upper-left/lower-right
         // negative diff means black in lower-left/upper-right
-        float pix_p = tmatch0.at<float>(pt);
-        float pix_n = tmatch1.at<float>(pt);
+        float pix_p = tmatch0.at<float>(rpt);
+        float pix_n = tmatch1.at<float>(rpt);
         float diff = pix_p - pix_n;
 
         // extract region of interest
-        const cv::Rect roi = cv::Rect(pt, tmpl_gray_p.size());
+        const cv::Rect roi = cv::Rect(rpt, tmpl_gray_p.size());
         cv::Mat img_roi(rsrc(roi));
 
-        // see if ROI has large range in pixel values and minimum is sufficiently dark
-        // a good candidate will have well-defined light and dark regions
+        // get pixel range stats in ROI
         double min_roi;
         double max_roi;
         cv::minMaxLoc(img_roi, &min_roi, &max_roi);
         double rng_roi = max_roi - min_roi;
 
+        // a landmark ROI should have two dark squares and and two light squares
+        // see if ROI has large range in pixel values and a minimum that is sufficiently dark
         if ((rng_roi > match_thr_rng) && (min_roi < match_thr_min))
         {
             // make a placeholder of info for the potential landmark
-            landmark_info_t lminfo{ pt + tmpl_offset, diff, rng_roi, { 0 } };
+            landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi, -1.0, { 0 } };
 
             // use bilateral filter to suppress as much noise as possible in ROI
             // while also preserving sharp edges
@@ -228,7 +222,7 @@ void BGRLandmark::perform_match(
 
             // see if pixel intensity has roughly symmetrical alternating light-dark pattern
             // like it would around a checkerboard corner
-            // first light-dark detection will k index back to 0
+            // first light-dark detection will wrap k index back to 0
             int k = 3;
             int prev_comp = 0;
             for (size_t i = 0; i < vec_test_points.size(); i++)
@@ -239,38 +233,48 @@ void BGRLandmark::perform_match(
                     // dark region
                     if (prev_comp >= 0)
                     {
-                        // previous was light or undetermined region so roll index
+                        // previous was light or undetermined region so roll over index
                         k = (k + 1) % 4;
                     }
                     prev_comp = -1;
-                    lminfo.run_ct[k]++;
                 }
                 else if (pix > med_thr)
                 {
                     // light region
                     if (prev_comp <= 0)
                     {
-                        // previous was dark or undetermined region so roll index
+                        // previous was dark or undetermined region so roll over index
                         k = (k + 1) % 4;
                     }
                     prev_comp = 1;
-                    lminfo.run_ct[k]++;
                 }
                 else
                 {
                     // undetermined region
                     prev_comp = 0;
                 }
+                lminfo.run_ct[k]++;
             }
 
-            // TODO -- check run_ct array for sane values
+            // calculate a symmetry score
+            // TODO -- not sure if this is right way to normalize this
+            double fac = vec_test_points.size() / 4.0;
+            double norm = sqrt((vec_test_points.size() - fac)*(vec_test_points.size() - fac) + (3 * fac*fac));
+            double d0 = lminfo.run_ct[0] - fac;
+            double d1 = lminfo.run_ct[1] - fac;
+            double d2 = lminfo.run_ct[2] - fac;
+            double d3 = lminfo.run_ct[3] - fac;
+            lminfo.sym = 1.0 - (sqrt(d0*d0 + d1*d1 + d2*d2 + d3*d3)/norm);
 
 #ifdef _DEBUG
         cv::imwrite("dbg_sample_gray.png", img_roi_proc);
 #endif
             
-            // all is well so apply template offset and save it
-            rinfo.push_back(lminfo);
+            // if all is well then save it to list
+            if (lminfo.sym > 0.8)
+            {
+                rinfo.push_back(lminfo);
+            }
         }
     }
 }

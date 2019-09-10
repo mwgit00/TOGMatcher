@@ -26,6 +26,7 @@
 #include "opencv2/videoio.hpp"
 
 #include <iostream>
+#include <fstream>
 #include <sstream>
 #include <iomanip>
 
@@ -254,6 +255,8 @@ void loop2(void)
     // and the image processing loop is running...
     bool is_running = true;
 
+    std::ofstream ofs("fud.txt");
+
     while (is_running)
     {
         // grab image
@@ -305,6 +308,12 @@ void loop2(void)
         std::vector<BGRLandmark::landmark_info_t> qinfo;
         bgrm.perform_match(img_gray, tmatch, qinfo);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
+        ofs << "--" << std::endl;
+        for (const auto& qq : qinfo)
+        {
+            ofs << qq.ctr << ", " << qq.diff << ", " << qq.rng << ", " << qq.min << ", " << qq.sym << ", [";
+            ofs << qq.run_ct[0] << "," << qq.run_ct[1] << "," << qq.run_ct[2] << "," << qq.run_ct[3] << "]" << std::endl;
+        }
 
         if (qinfo.size())
         {
@@ -372,6 +381,8 @@ void loop2(void)
         is_running = wait_and_check_keys(theKnobs);
     }
 
+    ofs.close();
+    
     // when everything is done, release the capture device and windows
     vcap.release();
     cv::destroyAllWindows();
