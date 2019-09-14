@@ -41,50 +41,28 @@ const cv::Scalar BGRLandmark::BGR_COLORS[8] =
     cv::Scalar(255, 255, 255),
 };
 
-const cv::Scalar BGRLandmark::BGR_TO_HLS[8] =
-{
-    cv::Scalar(0, 0, 0),
-    cv::Scalar(0, 128, 255),
-    cv::Scalar(60, 128, 255),
-    cv::Scalar(30, 128, 255),
-    cv::Scalar(120, 128, 255),
-    cv::Scalar(150, 128, 255),
-    cv::Scalar(90, 128, 255),
-    cv::Scalar(0, 255, 0),
-};
-
-const cv::Scalar BGRLandmark::BGR_TO_HSV[8] =
-{
-    cv::Scalar(0, 0, 0),
-    cv::Scalar(0, 255, 255),
-    cv::Scalar(60, 255, 255),
-    cv::Scalar(30, 255, 255),
-    cv::Scalar(120, 255, 255),
-    cv::Scalar(150, 255, 255),
-    cv::Scalar(90, 255, 255),
-    cv::Scalar(0, 0, 255),
-};
-
 const cv::Scalar BGRLandmark::BGR_BORDER = { 128, 128, 128 };
 
 const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_0 = { bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE };
 const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_A = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_B = { bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_B = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::MAGENTA };
 const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_C = { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_D = { bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_D = { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::MAGENTA };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_E = { bgr_t::BLACK, bgr_t::MAGENTA, bgr_t::BLACK, bgr_t::CYAN };
+const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_F = { bgr_t::BLACK, bgr_t::MAGENTA, bgr_t::BLACK, bgr_t::YELLOW };
 
 
 
 BGRLandmark::BGRLandmark()
 {
     init();
-#if 0
-    cv::Mat xx;
-    cv::Mat xy;
-    create_landmark_image(xx, 3.0, 0.25, PATTERN_0, { 255,255,255 });
-    cv::imwrite("foobgrlm.png", xx);
-    create_checkerboard_image(xy, 3, 5, 0.5, 0.25);
-    cv::imwrite("foobgrcb.png", xy);
+#if _DEBUG
+    cv::Mat img1;
+    cv::Mat img2;
+    create_landmark_image(img1, 3.0, 0.25, PATTERN_A, { 255,255,255 });
+    cv::imwrite("dbg_bgrlm.png", img1);
+    create_checkerboard_image(img2, 3, 5, 0.5, 0.25);
+    cv::imwrite("dbg_bgrcb.png", img2);
 #endif
 }
 
@@ -99,11 +77,9 @@ BGRLandmark::~BGRLandmark()
 
 void BGRLandmark::init(
     const int k,
-    const double match_thr_corr,
-    const double match_thr_rng,
-    const double match_thr_min,
-    const double match_thr_sym,
-    const bool is_rot_45)
+    const double thr_corr,
+    const int thr_pix_rng,
+    const int thr_pix_min)
 {
     // fix k to be odd and in range 9-15
     int fixk = ((k / 2) * 2) + 1;
@@ -111,19 +87,17 @@ void BGRLandmark::init(
     RAIL_MAX(fixk, 15);
     
     // apply thresholds
-    // TODO -- this currently is hard-coded for CV_8U, maybe that type should be asserted
-    this->match_thr_corr = match_thr_corr;
-    this->match_thr_rng = match_thr_rng * 255.0;
-    this->match_thr_min = match_thr_min * 255.0;
-    this->match_thr_sym = match_thr_sym;
+    // TODO -- assert type is CV_8U somewhere during match
+    this->thr_corr = thr_corr;
+    this->thr_pix_rng = thr_pix_rng;
+    this->thr_pix_min = thr_pix_min;
 
-    // create the templates
-    // TODO -- do 90 degree rotation based on colors
+    // create the B&W matching templates
     cv::Mat tmpl_bgr;
-    create_template_image(tmpl_bgr, fixk, PATTERN_0, is_rot_45);
-
+    create_template_image(tmpl_bgr, fixk, PATTERN_0);
     cv::cvtColor(tmpl_bgr, tmpl_gray_p, cv::COLOR_BGR2GRAY);
     cv::rotate(tmpl_gray_p, tmpl_gray_n, cv::ROTATE_90_CLOCKWISE);
+
 #ifdef _DEBUG
     imwrite("dbg_tmpl_gray_p.png", tmpl_gray_p);
     imwrite("dbg_tmpl_gray_n.png", tmpl_gray_n);
@@ -133,18 +107,6 @@ void BGRLandmark::init(
     const int fixkh = fixk / 2;
     tmpl_offset.x = fixkh;
     tmpl_offset.y = fixkh;
-
-    // create an array of points that cycle around a ROI
-    // these points will be sampled for a landmark candidate
-    mask_test_points = cv::Mat::zeros(tmpl_gray_p.size(), CV_8UC1);
-    //cv::cycle(img_cyc, tmpl_offset, tmpl_offset.x, 255, 1);
-    cv::rectangle(mask_test_points, { cv::Point(0, 0), cv::Point(fixk, fixk) }, 255, 1);
-#ifdef _DEBUG
-    imwrite("dbg_cyc_pts.png", mask_test_points);
-#endif
-    std::vector<std::vector<cv::Point>> contour_cyc;
-    cv::findContours(mask_test_points, contour_cyc, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
-    vec_test_points = contour_cyc[0];
 }
 
 
@@ -171,7 +133,7 @@ void BGRLandmark::perform_match(
 
     // then apply absolute threshold to get the best local maxima
     std::vector<std::vector<cv::Point>> contours;
-    cv::Mat match_masked = (rtmatch > match_thr_corr);
+    cv::Mat match_masked = (rtmatch > thr_corr);
     maxima_mask = maxima_mask & match_masked;
 
     // collect point locations of all local maxima
@@ -199,91 +161,21 @@ void BGRLandmark::perform_match(
 
         // a landmark ROI should have two dark squares and and two light squares
         // see if ROI has large range in pixel values and a minimum that is sufficiently dark
-        if ((rng_roi > match_thr_rng) && (min_roi < match_thr_min))
+        if ((rng_roi > thr_pix_rng) && (min_roi < thr_pix_min))
         {
-            // make a placeholder of info for the potential landmark
-            landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi, -1.0, { 0 } };
-
-            // use bilateral filter to suppress as much noise as possible in ROI
-            // while also preserving sharp edges
-            cv::Mat img_roi_proc;
-            cv::bilateralFilter(img_roi, img_roi_proc, 3, 200, 200);
-
-            // gather stats for path around outer edge of the ROI
-            // 2 dark regions should be below min_thr, both at similar level, so use a "hard" threshold
-            // 2 light regions should be above med_thr, possibly slightly different levels for each
-            // light regions will need an "easier" threshold since they can vary
-            double max;
-            double min;
-            cv::minMaxLoc(img_roi_proc, &min, &max, nullptr, nullptr, mask_test_points);
-            double rng_filt = max - min;
-            uint8_t min_thr = static_cast<uint8_t>(min + (0.1 * rng_filt));
-            uint8_t med_thr = static_cast<uint8_t>(min + (0.6 * rng_filt));
-
-            // see if pixel intensity has roughly symmetrical alternating light-dark pattern
-            // like it would around a checkerboard corner
-            // first light-dark detection will wrap k index back to 0
-            int k = 3;
-            int prev_comp = 0;
-            for (size_t i = 0; i < vec_test_points.size(); i++)
-            {
-                uint8_t pix = img_roi_proc.at<uint8_t>(vec_test_points[i]);
-                if (pix < min_thr)
-                {
-                    // dark region
-                    if (prev_comp >= 0)
-                    {
-                        // previous was light or undetermined region so roll over index
-                        k = (k + 1) % 4;
-                    }
-                    prev_comp = -1;
-                }
-                else if (pix > med_thr)
-                {
-                    // light region
-                    if (prev_comp <= 0)
-                    {
-                        // previous was dark or undetermined region so roll over index
-                        k = (k + 1) % 4;
-                    }
-                    prev_comp = 1;
-                }
-                else
-                {
-                    // undetermined region
-                    prev_comp = 0;
-                }
-                lminfo.run_ct[k]++;
-            }
-
-            // calculate a symmetry score
-            // TODO -- not sure if this is right way to normalize this
-            double fac = vec_test_points.size() / 4.0;
-            double norm = sqrt((vec_test_points.size() - fac)*(vec_test_points.size() - fac) + (3 * fac*fac));
-            double d0 = lminfo.run_ct[0] - fac;
-            double d1 = lminfo.run_ct[1] - fac;
-            double d2 = lminfo.run_ct[2] - fac;
-            double d3 = lminfo.run_ct[3] - fac;
-            lminfo.sym = 1.0 - (sqrt(d0*d0 + d1*d1 + d2*d2 + d3*d3)/norm);
-
-#ifdef _DEBUG
-        cv::imwrite("dbg_sample_gray.png", img_roi_proc);
-#endif
-            
-            // if all is well then save it to list
-            if (lminfo.sym > 0.8)
-            {
-                rinfo.push_back(lminfo);
-            }
+            // stuff it
+            // TODO -- add some kind of additional shape test
+            landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi };
+            rinfo.push_back(lminfo);
         }
     }
 }
 
 
 
-double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const BGRLandmark::landmark_info_t& rinfo) const
+int BGRLandmark::identify_colors(const cv::Mat& rimg, const BGRLandmark::landmark_info_t& rinfo) const
 {
-    double result = 0.0;
+    int result = -1;
 
     // get BGR region of interest around target point
     // template offset has added so subtract it again
@@ -291,25 +183,17 @@ double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const BGRLandmark::land
     const cv::Rect roi = cv::Rect(ctr_offset, tmpl_gray_p.size());
     
     // extract image from region of interest
-    cv::Mat img_hls;
-    cv::Mat img_channels[3];
     cv::Mat img_roi(rimg(roi));
 
-    // due median blur with size 1/3 of template size (forced to be odd)
+    // do median blur with size 1/3 of template size (forced to be odd)
     int k = tmpl_gray_n.size().width / 3;
     if ((k % 2) == 0) { k += 1; }
     cv::Mat img_roi_blur;
     cv::medianBlur(img_roi, img_roi_blur, k);
 
-    // then convert and extract hue channel
-    cv::cvtColor(img_roi, img_hls, cv::COLOR_BGR2HLS);
-    split(img_hls, img_channels);
+    // TODO -- identify yellow, cyan, magenta
 
-    // ???
-    
-    //cv::imwrite("sample_bgr.png", img_roi_blur);
-
-    return 0.0;
+    return result;
 }
 
 
@@ -320,8 +204,7 @@ double BGRLandmark::check_grid_hues(const cv::Mat& rimg, const BGRLandmark::land
 void BGRLandmark::create_template_image(
     cv::Mat& rimg,
     const int k,
-    const grid_colors_t& rcolors,
-    const bool is_rot_45)
+    const grid_colors_t& rcolors)
 {
     const int kh = k / 2;
 
@@ -334,13 +217,13 @@ void BGRLandmark::create_template_image(
 
     rimg = cv::Mat::zeros({ k, k }, CV_8UC3);
 
-    // fill in 2x2 blocks (clockwise from upper left)
+    // fill in 2x2 squares (clockwise from upper left)
     cv::rectangle(rimg, { 0, 0, kh, kh }, colors[0], -1);
     cv::rectangle(rimg, { kh + 1, 0, kh, kh }, colors[1], -1);
     cv::rectangle(rimg, { kh, kh, k - 1, k - 1 }, colors[2], -1);
     cv::rectangle(rimg, { 0, kh + 1, kh, kh }, colors[3], -1);
 
-    // fill in average at borders between blocks
+    // fill in average at borders between squares
     cv::Scalar avg_c00_c10 = (colors[0] + colors[1]) / 2;
     cv::Scalar avg_c10_c11 = (colors[1] + colors[2]) / 2;
     cv::Scalar avg_c11_c01 = (colors[2] + colors[3]) / 2;
@@ -350,17 +233,10 @@ void BGRLandmark::create_template_image(
     cv::line(rimg, { kh, kh }, { kh, k - 1 }, avg_c11_c01);
     cv::line(rimg, { 0, kh }, { kh, kh }, avg_c01_c00);
 
-    // fill in average of all blocks at central point
+    // central point gets average of all squares
     cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
     cv::line(rimg, { kh, kh }, { kh, kh }, avg_all);
 
-    if (is_rot_45)
-    {
-        // the scale of 1.42 (approx. square root of 2) fills the grid
-        const cv::Point2f fctr(static_cast<double>(kh), static_cast<double>(kh));
-        cv::Mat rot = cv::getRotationMatrix2D(fctr, 45.0, 1.42);
-        cv::warpAffine(rimg, rimg, rot, rimg.size());
-    }
 #ifdef _DEBUG
     cv::imwrite("dbg_tmpl_bgr.png", rimg);
 #endif
@@ -374,7 +250,6 @@ void BGRLandmark::create_landmark_image(
     const double dim_border,
     const grid_colors_t& rcolors,
     const cv::Scalar border_color,
-    const bool is_rot_45,
     const int dpi)
 {
     // set limits on 2x2 grid size (0.5 inch to 6.0 inch)
@@ -413,16 +288,6 @@ void BGRLandmark::create_landmark_image(
     cv::rectangle(img_grid, { kgridh, kgridh, kgrid - 1, kgrid - 1 }, colors[2], -1);
     cv::rectangle(img_grid, { 0, kgridh, kgridh, kgridh }, colors[3], -1);
 
-    // can rotate 45 degrees to make an "X" pattern instead of a grid
-    if (is_rot_45)
-    {
-        // the half-pixel offset centers things nicely for grid with even dimensions
-        // the scale of 1.42 (approx. square root of 2) fills the grid
-        const cv::Point2f fctr(static_cast<double>(kgridh) - 0.5, static_cast<double>(kgridh) - 0.5);
-        cv::Mat rot = cv::getRotationMatrix2D(fctr, 45.0, 1.42);
-        cv::warpAffine(img_grid, img_grid, rot, img_grid.size());
-    }
-
     // copy grid into image with border
     cv::Rect roi = cv::Rect({ kborder, kborder }, img_grid.size());
     img_grid.copyTo(rimg(roi));
@@ -438,7 +303,6 @@ void BGRLandmark::create_checkerboard_image(
     const double dim_border,
     const grid_colors_t& rcolors,
     const cv::Scalar border_color,
-    const bool is_rot_45,
     const int dpi)
 {
     // set limits on 2x2 grid size (0.5 inch to 2.0 inch)
@@ -466,7 +330,7 @@ void BGRLandmark::create_checkerboard_image(
     // create a 2x2 grid with no border
     // this will be replicated in the checkerboard
     cv::Mat img_grid;
-    create_landmark_image(img_grid, dim_grid_fix, 0.0, rcolors, { 255,255,255 }, is_rot_45, dpi);
+    create_landmark_image(img_grid, dim_grid_fix, 0.0, rcolors, { 255,255,255 }, dpi);
 
     // create image that will contain border and grid
     // fill it with border color

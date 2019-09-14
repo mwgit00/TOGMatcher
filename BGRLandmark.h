@@ -33,12 +33,10 @@ public:
 
     typedef struct
     {
-        cv::Point ctr;  // center point of landmark
-        double diff;    // value of positive template match minus negative template match
-        double rng;     // range of pixels in candidate ROI
-        double min;     // min pixel in candidate ROI
-        double sym;     // grid "symmetry" score for processed ROI that has passed pixel range tests
-        int run_ct[4];  // length of "runs" for dark-light regions going around border of ROI
+        cv::Point ctr;      // center point of landmark
+        double diff;        // value of positive template match minus negative template match
+        double rng;         // range of pixels in candidate ROI
+        double min;         // min pixel in candidate ROI
     } landmark_info_t;
 
     // names of colors with max and/or min BGR components
@@ -56,8 +54,6 @@ public:
 
     // there 8 colors with max/min BGR components
     static const cv::Scalar BGR_COLORS[8];
-    static const cv::Scalar BGR_TO_HLS[8];
-    static const cv::Scalar BGR_TO_HSV[8];
     static const cv::Scalar BGR_BORDER;
 
 
@@ -76,6 +72,8 @@ public:
     static const grid_colors_t PATTERN_B;
     static const grid_colors_t PATTERN_C;
     static const grid_colors_t PATTERN_D;
+    static const grid_colors_t PATTERN_E;
+    static const grid_colors_t PATTERN_F;
 
 
     BGRLandmark();
@@ -83,12 +81,10 @@ public:
 
     
     void init(
-        const int k = 11,
-        const double match_thr_corr = 1.6,
-        const double match_thr_rng = 0.333, // range of pixel values should be > 1/3 of pixel range
-        const double match_thr_min = 0.333, // dark landmark regions should be < 1/3 of pixel range
-        const double match_thr_sym = 0.9,
-        const bool is_rot_45 = false);
+        const int k = 9,
+        const double thr_corr = 1.6,    // threshold for dual match which produces results in range 0 to 2
+        const int thr_pix_rng = 85,     // seek range of pixels in landmark > 1/3 of max pixel val (255)
+        const int thr_pix_min = 85);    // seek dark regions in landmark < 1/3 of max pixel val (255)
 
     void perform_match(
         const cv::Mat& rsrc,
@@ -97,7 +93,7 @@ public:
 
     const cv::Point& get_template_offset(void) const { return tmpl_offset; }
 
-    double check_grid_hues(const cv::Mat& rimg, const BGRLandmark::landmark_info_t& rinfo) const;
+    int identify_colors(const cv::Mat& rimg, const BGRLandmark::landmark_info_t& rinfo) const;
 
     
     // creates printable 2x2 landmark image
@@ -107,7 +103,6 @@ public:
         const double dim_border = 0.25,
         const grid_colors_t& rcolors = PATTERN_A,
         const cv::Scalar border_color = BGR_BORDER,
-        const bool is_rot_45 = false,
         const int dpi = 96);
 
     // creates printable checkerboard by repeating a 2x2 landmark pattern
@@ -119,7 +114,6 @@ public:
         const double dim_border = 0.25,
         const grid_colors_t& rcolors = PATTERN_A,
         const cv::Scalar border_color = BGR_BORDER,
-        const bool is_rot_45 = false,
         const int dpi = 96);
 
 
@@ -129,17 +123,15 @@ private:
     static void create_template_image(
         cv::Mat& rimg,
         const int k,
-        const grid_colors_t& rcolors,
-        const bool is_rot_45 = false);
+        const grid_colors_t& rcolors);
 
 
 private:
 
-    // threshold for match consideration
-    double match_thr_corr;
-    double match_thr_rng;
-    double match_thr_min;
-    double match_thr_sym;
+    // thresholds for match consideration
+    double thr_corr;
+    int thr_pix_rng;
+    int thr_pix_min;
 
     // templates for 2x2 checkerboard grid
     cv::Mat tmpl_gray_p;
@@ -147,11 +139,6 @@ private:
 
     // offset for centering template location
     cv::Point tmpl_offset;
-
-    // contour and mask for checking landmark candidate
-    std::vector<cv::Point> vec_test_points;
-    cv::Mat mask_test_points;
-    cv::Mat shape_otsu;
 };
 
 #endif // BGR_LANDMARK_

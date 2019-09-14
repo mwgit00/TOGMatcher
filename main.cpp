@@ -255,8 +255,6 @@ void loop2(void)
     // and the image processing loop is running...
     bool is_running = true;
 
-    std::ofstream ofs("fud.txt");
-
     while (is_running)
     {
         // grab image
@@ -268,12 +266,6 @@ void loop2(void)
             static_cast<int>(capture_size.width * img_scale),
             static_cast<int>(capture_size.height * img_scale));
         resize(img, img_viewer, viewer_size);
-
-        //if (img_viewer.rows > img_cx_bgr.rows)
-        //{
-        //    Rect roi = cv::Rect({ 0, 0 }, img_cx_bgr.size());
-        //    //img_cx_bgr.copyTo(img_viewer(roi));
-        //}
 
         // apply the current channel setting
         int nchan = theKnobs.get_channel();
@@ -308,20 +300,6 @@ void loop2(void)
         std::vector<BGRLandmark::landmark_info_t> qinfo;
         bgrm.perform_match(img_gray, tmatch, qinfo);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
-        ofs << "--" << std::endl;
-        for (const auto& qq : qinfo)
-        {
-            ofs << qq.ctr << ", " << qq.diff << ", " << qq.rng << ", " << qq.min << ", " << qq.sym << ", [";
-            ofs << qq.run_ct[0] << "," << qq.run_ct[1] << "," << qq.run_ct[2] << "," << qq.run_ct[3] << "]" << std::endl;
-        }
-
-        if (qinfo.size())
-        {
-            for (const auto& r : qinfo)
-            {
-                bgrm.check_grid_hues(img_viewer, r);
-            }
-        }
 
         // apply the current output mode
         // content varies but all final output images are BGR
@@ -381,8 +359,6 @@ void loop2(void)
         is_running = wait_and_check_keys(theKnobs);
     }
 
-    ofs.close();
-    
     // when everything is done, release the capture device and windows
     vcap.release();
     cv::destroyAllWindows();
@@ -582,8 +558,15 @@ void loop(void)
 }
 
 
+
 int main(int argc, char** argv)
 {
+#if 0
+    // test BGRLandmark
     loop2();
+#else
+    // test TOGMatcher
+    loop();
+#endif
     return 0;
 }
