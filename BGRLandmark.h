@@ -82,9 +82,9 @@ public:
     
     void init(
         const int k = 9,
-        const double thr_corr = 1.6,    // threshold for dual match which produces results in range 0 to 2
-        const int thr_pix_rng = 85,     // seek range of pixels in landmark > 1/3 of max pixel val (255)
-        const int thr_pix_min = 85);    // seek dark regions in landmark < 1/3 of max pixel val (255)
+        const double thr_corr = 1.6,    // threshold for dual match (range is 0.0 to 2.0)
+        const int thr_pix_rng = 64,     // seek range of pixels > 1/4 of max pixel val (255)
+        const int thr_pix_min = 85);    // seek dark regions < 1/3 of max pixel val (255)
 
     void perform_match(
         const cv::Mat& rsrc,
