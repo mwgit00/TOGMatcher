@@ -5,14 +5,61 @@
 #include "BGRLandmark.h"
 #include "PatternRec.h"
 
+
+
 PatternRec::PatternRec()
 {
-
+    // generate DCT zigzag point lookup vector
+    get_zigzag_pts(kdct, _vzzpts);
 }
+
+
 
 PatternRec::~PatternRec()
 {
 
+}
+
+
+
+bool PatternRec::load_pca(const std::string& rs, cv::PCA& rpca)
+{
+    bool is_ok = false;
+    cv::FileStorage cvfs;
+    cvfs.open(rs, cv::FileStorage::READ);
+    if (cvfs.isOpened())
+    {
+        cv::FileNode cvfn = cvfs.root();
+        rpca.read(cvfn);
+        cvfs.release();
+        is_ok = true;
+    }
+    return is_ok;
+}
+
+
+
+bool PatternRec::run_csv_to_pca(
+    const std::string& rsin,
+    const std::string& rsout,
+    const double var_keep_fac)
+{
+    bool is_ok = false;
+
+    cv::Mat img_pca;
+    if (read_csv_into_mat(rsin, img_pca))
+    {
+        cv::PCA mypca(img_pca, cv::noArray(), cv::PCA::DATA_AS_ROW, var_keep_fac);
+        cv::FileStorage cvfs;
+        cvfs.open(rsout, cv::FileStorage::WRITE);
+        if (cvfs.isOpened())
+        {
+            mypca.write(cvfs);
+            cvfs.release();
+            is_ok = true;
+        }
+    }
+    return is_ok;
 }
 
 
@@ -35,7 +82,7 @@ bool PatternRec::read_csv_into_mat(const std::string& rs, cv::Mat& rimg)
             cv::Mat one_row;
             std::replace(s.begin(), s.end(), ',', ' ');
             std::istringstream iss(s);
-            while (!iss.eof())
+            while (!iss.eof() && is_ok)
             {
                 float val;
                 iss >> val;
@@ -144,18 +191,20 @@ void PatternRec::get_zigzag_pts(const int k, std::vector<cv::Point>& rvec)
 
 
 
-bool PatternRec::convert_samples_to_csv(const std::string& rsfile, const std::string& rstag)
+bool PatternRec::load_samples_from_img(
+    const std::string& rsfile,
+    const int maxsampct)
 {
-    bool result = false;
-
-    const int kdct = 8;
-    const int kdctmincomp = 1;
-    const int kdctmaxcomp = 20;
     const int kdctcompct = kdctmaxcomp - kdctmincomp + 1;
 
     cv::Mat img_gray;
     cv::Mat img = cv::imread(rsfile, cv::IMREAD_COLOR);
     cv::cvtColor(img, img_gray, cv::COLOR_BGR2GRAY);
+
+    if (img.size() == cv::Size{0, 0})
+    {
+        return false;
+    }
 
     // determine sizes of everything from known samples count
     cv::Size sz = img.size();
@@ -169,15 +218,11 @@ bool PatternRec::convert_samples_to_csv(const std::string& rsfile, const std::st
     BGRLandmark bgrm;
     bgrm.init(kdim);
 
-    // generate DCT zigzag point lookup vector
-    std::vector<cv::Point> vzigzagPts;
-    get_zigzag_pts(kdct, vzigzagPts);
+    // temporary vectors for the data...
+    std::vector<std::vector<float>> vvp;
+    std::vector<std::vector<float>> vvn;
+    std::vector<std::vector<float>> vv0;
 
-    // create training data structures
-    std::vector<std::vector<float>> vdatp;
-    std::vector<std::vector<float>> vdatn;
-    std::vector<std::vector<float>> vdat0;
-    
     // loop through all the sample images...
     for (int j = 0; j < SAMP_NUM_Y; j++)
     {
@@ -185,9 +230,9 @@ bool PatternRec::convert_samples_to_csv(const std::string& rsfile, const std::st
         {
             // get offset for box, rectangle border, and ROI
             cv::Point pt0{ i * sz_box.width, j * sz_box.height };
-            cv::Point pt1 = pt0 + cv::Point{ 1, 1};
+            cv::Point pt1 = pt0 + cv::Point{ 1, 1 };
             cv::Point pt2 = pt1 + cv::Point{ 1, 1 };
-            
+
             // get gray ROI and BGR pixel at corner of border rectangle in source image
             cv::Rect roi(pt2, sz_roi);
             cv::Mat img_roi = img_gray(roi);
@@ -199,7 +244,8 @@ bool PatternRec::convert_samples_to_csv(const std::string& rsfile, const std::st
             bgrm.perform_match(img_roi, img_match, lminfo);
 
             // make a square image of fixed dim
-            // convert to float in -128 to 127 range and run DCT on it (just like a JPEG block)
+            // convert to float in -128 to 127 range
+            // then run DCT on it (just like a JPEG block)
             cv::Mat img_dct, img_src, img_src_32f;
             cv::resize(img_roi, img_src, { kdct,kdct });
             img_src.convertTo(img_src_32f, CV_32F);
@@ -207,29 +253,30 @@ bool PatternRec::convert_samples_to_csv(const std::string& rsfile, const std::st
             cv::dct(img_src_32f, img_dct, 0);
 
             // create a feature vector for this sample
-            // by extracting components from the DCT
+            // by extracting components from the DCT using zigzag traversal
             std::vector<float> vfeature;
             for (int ii = kdctmincomp; ii <= kdctmaxcomp; ii++)
             {
-                float val = img_dct.at<float>(vzigzagPts[ii]);
+                float val = img_dct.at<float>(_vzzpts[ii]);
                 vfeature.push_back(val);
             }
 
             // stick feature vector in appropriate structure
             if ((bgr_pixel != cv::Scalar{ 255, 255, 255 }) || (lminfo.size() == 0))
             {
-                // non-white border (or no match from BGRLandmark) is junk sample
-                vdat0.push_back(vfeature);
+                // non-white border (or no match from BGRLandmark) is a junk sample
+                // a "red" border indicates junk but the red in the images has goofy BGR values
+                vv0.push_back(vfeature);
             }
             else if (lminfo[0].diff < 0)
             {
                 // this is a "negative" sample
-                vdatn.push_back(vfeature);
+                vvn.push_back(vfeature);
             }
             else
             {
                 // this is a "positive" sample
-                vdatp.push_back(vfeature);
+                vvp.push_back(vfeature);
             }
         }
     }
@@ -237,54 +284,50 @@ bool PatternRec::convert_samples_to_csv(const std::string& rsfile, const std::st
     // the samples have a crude ordering based on how they were collected
     // so shuffle in case we don't want to use all the samples
     // this insures a subset has similar variation
-    std::random_shuffle(vdatp.begin(), vdatp.end());
-    std::random_shuffle(vdatn.begin(), vdatn.end());
-    std::random_shuffle(vdat0.begin(), vdat0.end());
-
-    spew_float_vecs_to_csv(rstag, "_p", vdatp);
-    spew_float_vecs_to_csv(rstag, "_n", vdatn);
-    spew_float_vecs_to_csv(rstag, "_0", vdat0);
-
-    // some experimental stuff with PCA...
-
-    cv::Mat img_pca;
-    read_csv_into_mat("train_9x9_p.csv", img_pca);
-
-    cv::PCA mypca(img_pca, cv::noArray(), cv::PCA::DATA_AS_ROW, 0.98);
-    cv::FileStorage cvfs;
-    cvfs.open("fudge.yaml", cv::FileStorage::WRITE);
-    if (cvfs.isOpened())
+    if (maxsampct > 0)
     {
-        mypca.write(cvfs);
-        cvfs.release();
+        std::random_shuffle(vvp.begin(), vvp.end());
+        std::random_shuffle(vvn.begin(), vvn.end());
+        std::random_shuffle(vv0.begin(), vv0.end());
+        if (vvp.size() > maxsampct) vvp.resize(maxsampct);
+        if (vvn.size() > maxsampct) vvn.resize(maxsampct);
+        if (vv0.size() > maxsampct) vv0.resize(maxsampct);
     }
 
-    cv::Mat wug = mypca.project(vdatp[1]);
-    cv::Mat wog = mypca.backProject(wug);
+    // accumulate the data
+    _vvp.insert(_vvp.end(), vvp.begin(), vvp.end());
+    _vvn.insert(_vvn.end(), vvn.begin(), vvn.end());
+    _vv0.insert(_vv0.end(), vv0.begin(), vv0.end());
 
-    cv::Mat img_idct = cv::Mat::zeros({ kdct, kdct }, CV_32F);
-    int mm = 0;
-    for (int ii = kdctmincomp; ii <= kdctmaxcomp; ii++)
-    {
-        img_idct.at<float>(vzigzagPts[ii]) = wog.at<float>(0, mm);
-        mm++;
-    }
-    cv::Mat bug;
-    cv::idct(img_idct, bug, 0);
-    cv::normalize(bug, bug, 0, 255, cv::NORM_MINMAX);
-    cv::Mat zug;
-    bug.convertTo(zug, CV_8U);
-    cv::imwrite("zug.png", zug);
-
-    //std::ofstream ofs;
-    //ofs.open("fug.csv");
-    //ofs << cv::format(img_pca, cv::Formatter::FMT_CSV) << std::endl;
-    //ofs.close();
-    
-    return result;
+    return true;
 }
 
 
-void run_pca()
+
+void PatternRec::save_samples_to_csv(const std::string& rsprefix)
 {
+    spew_float_vecs_to_csv(rsprefix, "_p", _vvp);
+    spew_float_vecs_to_csv(rsprefix, "_n", _vvn);
+    spew_float_vecs_to_csv(rsprefix, "_0", _vv0);
+}
+
+
+
+void PatternRec::samp_to_pattern(const std::vector<float>& rsamp, cv::Mat& rimg)
+{
+    cv::Mat img_dct = cv::Mat::zeros({ kdct, kdct }, CV_32F);
+    
+    // reconstruct DCT components
+    int mm = 0;
+    for (int ii = kdctmincomp; ii <= kdctmaxcomp; ii++)
+    {
+        img_dct.at<float>(_vzzpts[ii]) = rsamp[mm];
+        mm++;
+    }
+
+    // invert DCT and rescale for a gray image
+    cv::Mat img_idct;
+    cv::idct(img_dct, img_idct, 0);
+    cv::normalize(img_idct, img_idct, 0, 255, cv::NORM_MINMAX);
+    img_idct.convertTo(rimg, CV_8U);
 }

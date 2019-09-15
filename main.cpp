@@ -30,6 +30,7 @@
 #include <sstream>
 #include <iomanip>
 
+#include "PatternRec.h"
 #include "BGRLandmark.h"
 #include "TOGMatcher.h"
 #include "Knobs.h"
@@ -559,8 +560,40 @@ void loop(void)
 
 
 
+void test_patt_rec()
+{
+    // some experimental stuff with PCA...
+    PatternRec prfoo;
+    prfoo.load_samples_from_img("samples_1K_9x9_markup.png", 100);
+    prfoo.load_samples_from_img("samples_1K_9x9_markup2.png", 100);
+    prfoo.load_samples_from_img("samples_1K_11x11_markup.png", 100);
+    prfoo.load_samples_from_img("samples_1K_11x11_markup2.png", 100);
+    prfoo.load_samples_from_img("samples_1K_13x13_markup.png", 100);
+    prfoo.load_samples_from_img("samples_1K_15x15_markup.png", 100);
+    prfoo.save_samples_to_csv("train_all");
+    
+    PatternRec::run_csv_to_pca("train_all_p.csv", "train_all_pca.yaml", 0.95);
+
+    cv::PCA mypca;
+    PatternRec::load_pca("train_all_pca.yaml", mypca);
+    
+    // test PCA project and back-project to get back DCT components
+    cv::Mat samp_pca = mypca.project(prfoo.get_p_sample(388));
+    cv::Mat samp_dct = mypca.backProject(samp_pca);
+
+    // convert components back to image
+    // this better look like a checker board corner
+    cv::Mat img_test;
+    prfoo.samp_to_pattern(samp_dct, img_test);
+    cv::imwrite("dbg_test_pca.png", img_test);
+}
+
+
+
 int main(int argc, char** argv)
 {
+    //test_patt_rec();
+
 #if 0
     // test BGRLandmark
     loop2();
