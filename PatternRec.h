@@ -24,7 +24,8 @@ public:
     
     bool load_samples_from_img(
         const std::string& rsfile,
-        const int maxsampct = -1);
+        const int maxsampct = -1,
+        const bool is_axes_flipped = false);
 
     void save_samples_to_csv(const std::string& rsprefix);
 

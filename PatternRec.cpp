@@ -193,7 +193,8 @@ void PatternRec::get_zigzag_pts(const int k, std::vector<cv::Point>& rvec)
 
 bool PatternRec::load_samples_from_img(
     const std::string& rsfile,
-    const int maxsampct)
+    const int maxsampct,
+    const bool is_axes_flipped)
 {
     const int kdctcompct = kdctmaxcomp - kdctmincomp + 1;
 
@@ -204,6 +205,11 @@ bool PatternRec::load_samples_from_img(
     if (img.size() == cv::Size{0, 0})
     {
         return false;
+    }
+
+    if (is_axes_flipped)
+    {
+        cv::flip(img_gray, img_gray, -1);
     }
 
     // determine sizes of everything from known samples count

@@ -570,15 +570,28 @@ void test_patt_rec()
     prfoo.load_samples_from_img("samples_1K_11x11_markup2.png", 100);
     prfoo.load_samples_from_img("samples_1K_13x13_markup.png", 100);
     prfoo.load_samples_from_img("samples_1K_15x15_markup.png", 100);
+    
+    // due to the nature of the target image, a double flip produces more valid training samples
+    prfoo.load_samples_from_img("samples_1K_9x9_markup.png", 100, true);
+    prfoo.load_samples_from_img("samples_1K_9x9_markup2.png", 100, true);
+    prfoo.load_samples_from_img("samples_1K_11x11_markup.png", 100, true);
+    prfoo.load_samples_from_img("samples_1K_11x11_markup2.png", 100, true);
+    prfoo.load_samples_from_img("samples_1K_13x13_markup.png", 100, true);
+    prfoo.load_samples_from_img("samples_1K_15x15_markup.png", 100, true);
+    
+    // dump all the samples...
     prfoo.save_samples_to_csv("train_all");
     
-    PatternRec::run_csv_to_pca("train_all_p.csv", "train_all_pca.yaml", 0.95);
+    // run PCA with 0.96 variance threshold
+    // testing shows this reduces the components down to 9
+    // which is symmetrical in the upper left corner of the 8x8 DCT image
+    PatternRec::run_csv_to_pca("train_all_p.csv", "train_all_pca.yaml", 0.96);
 
     cv::PCA mypca;
     PatternRec::load_pca("train_all_pca.yaml", mypca);
     
     // test PCA project and back-project to get back DCT components
-    cv::Mat samp_pca = mypca.project(prfoo.get_p_sample(388));
+    cv::Mat samp_pca = mypca.project(prfoo.get_p_sample(988));
     cv::Mat samp_dct = mypca.backProject(samp_pca);
 
     // convert components back to image
@@ -599,6 +612,7 @@ int main(int argc, char** argv)
     loop2();
 #else
     // test TOGMatcher
+    // add some pre-processing blurring, add some template blurring, turn on mask option
     loop();
 #endif
     return 0;
