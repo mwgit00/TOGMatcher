@@ -208,7 +208,7 @@ void Knobs::handle_keypress(const char ckey)
     if (is_valid && !is_op_required)
     {
         const std::vector<std::string> srgb({ "Blue ", "Green", "Red  ", "Gray " });
-        const std::vector<std::string> sout({ "Raw  ", "Mask ", "Color", "Aux" });
+        const std::vector<std::string> sout({ "Raw  ", "Mask ", "Color", "Aux  " });
         std::cout << "Equ=" << is_equ_hist_enabled;
         std::cout << "  Mask=" << is_mask_enabled;
         std::cout << "  Blur=" << kpreblur;

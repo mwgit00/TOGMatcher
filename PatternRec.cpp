@@ -200,7 +200,6 @@ bool PatternRec::load_samples_from_img(
 
     cv::Mat img_gray;
     cv::Mat img = cv::imread(rsfile, cv::IMREAD_COLOR);
-    cv::cvtColor(img, img_gray, cv::COLOR_BGR2GRAY);
 
     if (img.size() == cv::Size{0, 0})
     {
@@ -209,8 +208,10 @@ bool PatternRec::load_samples_from_img(
 
     if (is_axes_flipped)
     {
-        cv::flip(img_gray, img_gray, -1);
+        cv::flip(img, img, -1);
     }
+
+    cv::cvtColor(img, img_gray, cv::COLOR_BGR2GRAY);
 
     // determine sizes of everything from known samples count
     cv::Size sz = img.size();
@@ -223,6 +224,7 @@ bool PatternRec::load_samples_from_img(
     // now that dimension is known a BGRLandmark matcher can be created
     BGRLandmark bgrm;
     bgrm.init(kdim);
+    bgrm.set_color_id_enable(false);
 
     // temporary vectors for the data...
     std::vector<std::vector<float>> vvp;
@@ -247,7 +249,7 @@ bool PatternRec::load_samples_from_img(
             // these should all match because they were captured with same settings
             cv::Mat img_match;
             std::vector<BGRLandmark::landmark_info_t> lminfo;
-            bgrm.perform_match(img_roi, img_match, lminfo);
+            bgrm.perform_match(img(roi), img_roi, img_match, lminfo);
 
             // make a square image of fixed dim
             // convert to float in -128 to 127 range

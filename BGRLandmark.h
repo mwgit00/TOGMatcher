@@ -20,8 +20,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#ifndef BGR_LANDMARK_
-#define BGR_LANDMARK_
+#ifndef BGR_LANDMARK_H_
+#define BGR_LANDMARK_H_
+
+// uncomment this to collect 1000 samples and write them to an image file when done
+//#define _COLLECT_SAMPLES
 
 #include "opencv2/imgproc.hpp"
 #include "TOGMatcher.h"
@@ -37,6 +40,8 @@ public:
         double diff;        // value of positive template match minus negative template match
         double rng;         // range of pixels in candidate ROI
         double min;         // min pixel in candidate ROI
+        int c0;
+        int c1;
     } landmark_info_t;
 
     // names of colors with max and/or min BGR components
@@ -68,6 +73,7 @@ public:
 
     // some standard colored checkerboard patterns
     static const grid_colors_t PATTERN_0;
+    static const grid_colors_t PATTERN_1;
     static const grid_colors_t PATTERN_A;
     static const grid_colors_t PATTERN_B;
     static const grid_colors_t PATTERN_C;
@@ -87,13 +93,14 @@ public:
         const int thr_pix_min = 85);    // seek dark regions < 1/3 of max pixel val (255)
 
     void perform_match(
+        const cv::Mat& rsrc_bgr,
         const cv::Mat& rsrc,
         cv::Mat& rtmatch,
         std::vector<BGRLandmark::landmark_info_t>& rpts);
 
     const cv::Point& get_template_offset(void) const { return tmpl_offset; }
 
-    int identify_colors(const cv::Mat& rimg, const BGRLandmark::landmark_info_t& rinfo) const;
+    void set_color_id_enable(const bool f) { is_color_id_enabled = f; }
 
     
     // creates printable 2x2 landmark image
@@ -118,6 +125,8 @@ public:
 
 
 private:
+
+    void identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_info_t& rinfo) const;
     
     // creates a 2x2 grid or "X" pattern BGR template of pixel dimension k
     static void create_template_image(
@@ -127,6 +136,9 @@ private:
 
 
 private:
+
+    // size of square landmark template
+    int kdim;
 
     // thresholds for match consideration
     double thr_corr;
@@ -139,6 +151,16 @@ private:
 
     // offset for centering template location
     cv::Point tmpl_offset;
+
+    bool is_color_id_enabled;
+
+#ifdef _COLLECT_SAMPLES
+public:
+    const int sampx = 40;
+    const int sampy = 25;
+    int samp_ct;
+    cv::Mat samples;
+#endif
 };
 
-#endif // BGR_LANDMARK_
+#endif // BGR_LANDMARK_H_

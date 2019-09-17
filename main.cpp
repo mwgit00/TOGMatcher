@@ -299,8 +299,12 @@ void loop2(void)
 
         // look for landmarks
         std::vector<BGRLandmark::landmark_info_t> qinfo;
-        bgrm.perform_match(img_gray, tmatch, qinfo);
+        bgrm.perform_match(img_viewer, img_gray, tmatch, qinfo);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
+
+#ifdef _COLLECT_SAMPLES
+        std::cout << bgrm.samp_ct << std::endl;
+#endif
 
         // apply the current output mode
         // content varies but all final output images are BGR
