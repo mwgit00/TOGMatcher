@@ -60,7 +60,6 @@ const std::map<char, BGRLandmark::grid_colors_t> BGRLandmark::PATTERN_MAP =
 
 
 
-
 // returns a value "railed" to fall within a max-min range
 template <class T>
 static T apply_rail(const T v, const T vmin, const T vmax)
