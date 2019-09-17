@@ -2,7 +2,7 @@
 
 This is a project for doing experiments with OpenCV template matching using X and Y gradient images as the templates.  It also has code for doing experiments with template matching for finding colored landmarks.  The landmarks are 2x2 grids with two black squares at the diagonals as in a classic checkerboard.  The other squares are colored yellow, magenta, or cyan.  These are bright colors with one B,G,R component set to 0.  This provides good contrast with the black squares and limiting the number of colors makes it easier to identify them.  The colored squares must be different from one another.  This scheme only produces 12 unique patterns but the detection performance seems to be reasonably good.  The code has routines for creating PNG files that can be printed for use as landmarks in a lab, home, etc.
 
-I have also been tinkerng with some statistical pattern recognition stuff.  It doesn't do much yet.
+I have also been tinkering with some statistical pattern recognition stuff.  That code doesn't do much yet.  The goal was to have an alternate way to recognize the landmarks but it may have been a bit too ambitious.
 
 # Installation
 
