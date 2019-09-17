@@ -26,15 +26,6 @@
 
 
 
-// returns a value "railed" to fall within a max-min range
-template <class T>
-static T apply_rail(const T v, const T vmin, const T vmax)
-{
-    return (v > vmax) ? vmax : ((v < vmin) ? vmin : v);
-}
-
-
-
 const cv::Scalar BGRLandmark::BGR_COLORS[8] =
 {
     cv::Scalar(0, 0, 0),
@@ -49,14 +40,55 @@ const cv::Scalar BGRLandmark::BGR_COLORS[8] =
 
 const cv::Scalar BGRLandmark::BGR_BORDER = { 128, 128, 128 };
 
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_0 = { bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_1 = { bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_A = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::MAGENTA };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_B = { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_C = { bgr_t::BLACK, bgr_t::MAGENTA, bgr_t::BLACK, bgr_t::YELLOW };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_D = { bgr_t::BLACK, bgr_t::MAGENTA, bgr_t::BLACK, bgr_t::CYAN };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_E = { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW };
-const BGRLandmark::grid_colors_t BGRLandmark::PATTERN_F = { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::MAGENTA };
+const std::map<char, BGRLandmark::grid_colors_t> BGRLandmark::PATTERN_MAP =
+{
+    { '0', { bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE }},
+    { '1', { bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK }},
+    { 'A', { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::MAGENTA }},
+    { 'B', { bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN }},
+    { 'C', { bgr_t::BLACK, bgr_t::MAGENTA, bgr_t::BLACK, bgr_t::YELLOW }},
+    { 'D', { bgr_t::BLACK, bgr_t::MAGENTA, bgr_t::BLACK, bgr_t::CYAN }},
+    { 'E', { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW }},
+    { 'F', { bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK, bgr_t::MAGENTA }},
+    { 'G', { bgr_t::YELLOW, bgr_t::BLACK, bgr_t::MAGENTA, bgr_t::BLACK }},
+    { 'H', { bgr_t::YELLOW, bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK }},
+    { 'I', { bgr_t::MAGENTA, bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK }},
+    { 'J', { bgr_t::MAGENTA, bgr_t::BLACK, bgr_t::CYAN, bgr_t::BLACK }},
+    { 'K', { bgr_t::CYAN, bgr_t::BLACK, bgr_t::YELLOW, bgr_t::BLACK }},
+    { 'L', { bgr_t::CYAN, bgr_t::BLACK, bgr_t::MAGENTA, bgr_t::BLACK }}
+};
+
+
+
+
+// returns a value "railed" to fall within a max-min range
+template <class T>
+static T apply_rail(const T v, const T vmin, const T vmax)
+{
+    return (v > vmax) ? vmax : ((v < vmin) ? vmin : v);
+}
+
+
+
+// this only works if a and b are both 0,1,2 and a != b
+static int get_bgr_code(double s, const int a, const int b)
+{
+    int code = 0;
+    if (a == 0)
+    {
+        code = (b == 1) ? 0 : 1;  // 0,1 or 0,2
+    }
+    else if (a == 1)
+    {
+        code = (b == 0) ? 2 : 3;  // 1,0 or 1,2
+    }
+    else
+    {
+        code = (b == 0) ? 4 : 5;  // 2,0 or 2,1
+    }
+    if (s < 0.0) code += 6;
+    return code;
+}
 
 
 
@@ -64,11 +96,16 @@ BGRLandmark::BGRLandmark()
 {
     init();
 #ifdef _DEBUG
-    cv::Mat img1;
     cv::Mat img2;
-    create_landmark_image(img1, 3.0, 0.25, PATTERN_A, { 255,255,255 });
-    cv::imwrite("dbg_bgrlm.png", img1);
-    create_checkerboard_image(img2, 3, 5, 0.5, 0.25);
+    for (int i = 0; i < 12; i++)
+    {
+        cv::Mat img1;
+        char c = i + 'A';
+        std::string s = "dbg_bgrlm_" + std::string(1, c) + ".png";
+        create_landmark_image(img1, 3.0, 0.25, PATTERN_MAP.find(c)->second, { 255,255,255 });
+        cv::imwrite(s, img1);
+    }
+    create_checkerboard_image(img2, 3, 5, 0.5, 0.25, PATTERN_MAP.find('L')->second);
     cv::imwrite("dbg_bgrcb.png", img2);
 #endif
 }
@@ -101,8 +138,9 @@ void BGRLandmark::init(
     this->thr_pix_min = thr_pix_min;
 
     // create the B&W matching templates
+    const grid_colors_t colors = PATTERN_MAP.find('0')->second;
     cv::Mat tmpl_bgr;
-    create_template_image(tmpl_bgr, kdim, PATTERN_0);
+    create_template_image(tmpl_bgr, kdim, colors);
     cv::cvtColor(tmpl_bgr, tmpl_gray_p, cv::COLOR_BGR2GRAY);
     cv::rotate(tmpl_gray_p, tmpl_gray_n, cv::ROTATE_90_CLOCKWISE);
 
@@ -180,7 +218,7 @@ void BGRLandmark::perform_match(
         if ((rng_roi > thr_pix_rng) && (min_roi < thr_pix_min))
         {
             // start filling in landmark info
-            landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi, -1, -1 };
+            landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi, -1 };
 
             cv::Mat img_roi_bgr(rsrc_bgr(roi));
 
@@ -210,13 +248,10 @@ void BGRLandmark::perform_match(
                 cv::bilateralFilter(img_roi_bgr, img_roi_bgr_proc, 3, 200, 200);
                 identify_colors(img_roi_bgr_proc, lminfo);
 
-                // save it if color test gave a sane result (2 valid but different colors)
-                if ((lminfo.c0 != -1) && (lminfo.c1 != -1))
+                // save it if color test gave a sane result
+                if (lminfo.code != -1)
                 {
-                    if (lminfo.c0 != lminfo.c1)
-                    {
-                        rinfo.push_back(lminfo);
-                    }
+                    rinfo.push_back(lminfo);
                 }
             }
             else
@@ -229,117 +264,8 @@ void BGRLandmark::perform_match(
 
 
 
-void BGRLandmark::identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_info_t& rinfo) const
-{
-    int result = -1;
-    const cv::Vec3f norm_ycm[3] = 
-    {
-        {0, 1, 1},  // 0GR yellow
-        {1, 0, 1},  // B0R magenta
-        {1, 1, 0},  // BG0 cyan 
-    };
-
-    cv::Vec3f p0;
-    cv::Vec3f p1;
-
-    // find BGR at appropriate colored corners
-    if (rinfo.diff > 0)
-    {
-        // "positive" landmark
-        p0 = rimg.at<cv::Vec3b>(0, kdim - 1);
-        p1 = rimg.at<cv::Vec3b>(kdim - 1, 0);
-    }
-    else
-    {
-        // "negative" landmark
-        p0 = rimg.at<cv::Vec3b>(0, 0);
-        p1 = rimg.at<cv::Vec3b>(kdim - 1, kdim - 1);
-    }
-
-    // get ranges for corners
-    double p0max, p0min, p0rng;
-    double p1max, p1min, p1rng;
-    cv::minMaxLoc(p0, &p0min, &p0max);
-    cv::minMaxLoc(p1, &p1min, &p1max);
-    p0rng = p0max - p0min;
-    p1rng = p1max - p1min;
-
-    // then normalize the BGR components
-    cv::normalize(p0, p0, 0, 1, cv::NORM_MINMAX);
-    cv::normalize(p1, p1, 0, 1, cv::NORM_MINMAX);
-
-    // this BGR "score" will range from 1 to 2
-    // something in the middle means a yellow-magenta-cyan match can be performed
-    double s0 = p0[0] + p0[1] + p0[2];
-    double s1 = p1[0] + p1[1] + p1[2];
-
-    // see if there's enough contribution from two channels
-    // to qualify as valid yellow-magenta-cyan classification
-    // (these thresholds are pretty low)
-    double bgr_norm_thr = 1.2;
-    double bgr_rng_thr = 20;
-    if ((s0 > bgr_norm_thr) && (s1 > bgr_norm_thr) && (p0rng > bgr_rng_thr) && (p1rng > bgr_rng_thr))
-    {
-        // find closest color match
-        double q0min = 3.0;
-        double q1min = 3.0;
-        for (int i = 0; i < 3; i++)
-        {
-            double q0 = cv::norm(p0, norm_ycm[i], cv::NORM_L2);
-            double q1 = cv::norm(p1, norm_ycm[i], cv::NORM_L2);
-            if (q0 < q0min) { q0min = q0; rinfo.c0 = i; }
-            if (q1 < q1min) { q1min = q1; rinfo.c1 = i; }
-        }
-    }
-}
-
-
-
 ///////////////////////////////////////////////////////////////////////////////
-// CLASS STATIC FUNCTIONS
-
-void BGRLandmark::create_template_image(
-    cv::Mat& rimg,
-    const int k,
-    const grid_colors_t& rcolors)
-{
-    const int kh = k / 2;
-
-    // set colors of each square in 2x2 grid, index is clockwise from upper left
-    cv::Scalar colors[4];
-    colors[0] = BGR_COLORS[static_cast<int>(rcolors.c00)];
-    colors[1] = BGR_COLORS[static_cast<int>(rcolors.c01)];
-    colors[2] = BGR_COLORS[static_cast<int>(rcolors.c11)];
-    colors[3] = BGR_COLORS[static_cast<int>(rcolors.c10)];
-
-    rimg = cv::Mat::zeros({ k, k }, CV_8UC3);
-
-    // fill in 2x2 squares (clockwise from upper left)
-    cv::rectangle(rimg, { 0, 0, kh, kh }, colors[0], -1);
-    cv::rectangle(rimg, { kh + 1, 0, kh, kh }, colors[1], -1);
-    cv::rectangle(rimg, { kh, kh, k - 1, k - 1 }, colors[2], -1);
-    cv::rectangle(rimg, { 0, kh + 1, kh, kh }, colors[3], -1);
-
-    // fill in average at borders between squares
-    cv::Scalar avg_c00_c10 = (colors[0] + colors[1]) / 2;
-    cv::Scalar avg_c10_c11 = (colors[1] + colors[2]) / 2;
-    cv::Scalar avg_c11_c01 = (colors[2] + colors[3]) / 2;
-    cv::Scalar avg_c01_c00 = (colors[3] + colors[0]) / 2;
-    cv::line(rimg, { kh, 0 }, { kh, kh }, avg_c00_c10);
-    cv::line(rimg, { kh, kh }, { k - 1, kh }, avg_c10_c11);
-    cv::line(rimg, { kh, kh }, { kh, k - 1 }, avg_c11_c01);
-    cv::line(rimg, { 0, kh }, { kh, kh }, avg_c01_c00);
-
-    // central point gets average of all squares
-    cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
-    cv::line(rimg, { kh, kh }, { kh, kh }, avg_all);
-
-#ifdef _DEBUG
-    cv::imwrite("dbg_tmpl_bgr.png", rimg);
-#endif
-}
-
-
+// PUBLIC CLASS STATIC FUNCTIONS
 
 void BGRLandmark::create_landmark_image(
     cv::Mat& rimg,
@@ -429,4 +355,145 @@ void BGRLandmark::create_checkerboard_image(
     // copy repeated block pattern into image
     cv::Rect roi(cv::Point(kborder, kborder), img_reps.size());
     img_reps.copyTo(rimg(roi));
+}
+
+
+
+///////////////////////////////////////////////////////////////////////////////
+// PRIVATE CLASS STATIC FUNCTIONS
+
+void BGRLandmark::create_template_image(
+    cv::Mat& rimg,
+    const int k,
+    const grid_colors_t& rcolors)
+{
+    const int kh = k / 2;
+
+    // set colors of each square in 2x2 grid, index is clockwise from upper left
+    cv::Scalar colors[4];
+    colors[0] = BGR_COLORS[static_cast<int>(rcolors.c00)];
+    colors[1] = BGR_COLORS[static_cast<int>(rcolors.c01)];
+    colors[2] = BGR_COLORS[static_cast<int>(rcolors.c11)];
+    colors[3] = BGR_COLORS[static_cast<int>(rcolors.c10)];
+
+    rimg = cv::Mat::zeros({ k, k }, CV_8UC3);
+
+    // fill in 2x2 squares (clockwise from upper left)
+    cv::rectangle(rimg, { 0, 0, kh, kh }, colors[0], -1);
+    cv::rectangle(rimg, { kh + 1, 0, kh, kh }, colors[1], -1);
+    cv::rectangle(rimg, { kh, kh, k - 1, k - 1 }, colors[2], -1);
+    cv::rectangle(rimg, { 0, kh + 1, kh, kh }, colors[3], -1);
+
+    // fill in average at borders between squares
+    cv::Scalar avg_c00_c10 = (colors[0] + colors[1]) / 2;
+    cv::Scalar avg_c10_c11 = (colors[1] + colors[2]) / 2;
+    cv::Scalar avg_c11_c01 = (colors[2] + colors[3]) / 2;
+    cv::Scalar avg_c01_c00 = (colors[3] + colors[0]) / 2;
+    cv::line(rimg, { kh, 0 }, { kh, kh }, avg_c00_c10);
+    cv::line(rimg, { kh, kh }, { k - 1, kh }, avg_c10_c11);
+    cv::line(rimg, { kh, kh }, { kh, k - 1 }, avg_c11_c01);
+    cv::line(rimg, { 0, kh }, { kh, kh }, avg_c01_c00);
+
+    // central point gets average of all squares
+    cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
+    cv::line(rimg, { kh, kh }, { kh, kh }, avg_all);
+
+#ifdef _DEBUG
+    cv::imwrite("dbg_tmpl_bgr.png", rimg);
+#endif
+}
+
+
+
+void BGRLandmark::identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_info_t& rinfo) const
+{
+    int result = -1;
+    const cv::Vec3f norm_ycm[3] =
+    {
+        {0, 1, 1},  // 0GR yellow
+        {1, 0, 1},  // B0R magenta
+        {1, 1, 0},  // BG0 cyan 
+    };
+
+    cv::Vec3f p0;
+    cv::Vec3f p1;
+
+    // find BGR at appropriate colored corners
+    if (rinfo.diff > 0)
+    {
+        // "positive" landmark
+        p0 = rimg.at<cv::Vec3b>(0, kdim - 1);
+        p1 = rimg.at<cv::Vec3b>(kdim - 1, 0);
+    }
+    else
+    {
+        // "negative" landmark
+        p0 = rimg.at<cv::Vec3b>(0, 0);
+        p1 = rimg.at<cv::Vec3b>(kdim - 1, kdim - 1);
+    }
+
+    // get ranges for corners
+    double p0max, p0min, p0rng;
+    double p1max, p1min, p1rng;
+    cv::minMaxLoc(p0, &p0min, &p0max);
+    cv::minMaxLoc(p1, &p1min, &p1max);
+    p0rng = p0max - p0min;
+    p1rng = p1max - p1min;
+
+    // then normalize the BGR components
+    cv::normalize(p0, p0, 0, 1, cv::NORM_MINMAX);
+    cv::normalize(p1, p1, 0, 1, cv::NORM_MINMAX);
+
+    // this BGR "score" will range from 1 to 2
+    // something in the middle means a yellow-magenta-cyan match can be performed
+    double s0 = p0[0] + p0[1] + p0[2];
+    double s1 = p1[0] + p1[1] + p1[2];
+
+    // see if there's enough contribution from two channels
+    // to qualify as valid yellow-magenta-cyan classification
+    // these thresholds are pretty low but can help filter out false positives
+    // TODO -- maybe make these tunable
+    double bgr_norm_thr = 1.2;
+    double bgr_rng_thr = 20;
+    if ((s0 > bgr_norm_thr) && (s1 > bgr_norm_thr) && (p0rng > bgr_rng_thr) && (p1rng > bgr_rng_thr))
+    {
+        // find closest color match
+        double q0min = 3.0;
+        double q1min = 3.0;
+        int nc0 = -1;
+        int nc1 = -1;
+        for (int i = 0; i < 3; i++)
+        {
+            double q0 = cv::norm(p0, norm_ycm[i], cv::NORM_L2);
+            double q1 = cv::norm(p1, norm_ycm[i], cv::NORM_L2);
+            if (q0 < q0min) { q0min = q0; nc0 = i; }
+            if (q1 < q1min) { q1min = q1; nc1 = i; }
+        }
+        rinfo.code = get_bgr_code(rinfo.diff, nc0, nc1);
+    }
+}
+
+
+
+int BGRLandmark::get_bgr_code(double s, const int a, const int b)
+{
+    // a and b must be in range [0,1,2] and not equal
+    int code = -1;
+    if ((a != b) && (a >= 0) && (a <= 2) && (b >= 0) && (b <= 2))
+    {
+        if (a == 0)
+        {
+            code = (b == 1) ? 0 : 1;  // 0,1 or 0,2
+        }
+        else if (a == 1)
+        {
+            code = (b == 0) ? 2 : 3;  // 1,0 or 1,2
+        }
+        else
+        {
+            code = (b == 0) ? 4 : 5;  // 2,0 or 2,1
+        }
+        if (s < 0.0) code += 6;
+    }
+    return code;
 }

@@ -316,7 +316,10 @@ void loop2(void)
                 // draw circles around all BGR landmarks
                 for (const auto& r : qinfo)
                 {
+                    char x[2] = { 0 };
+                    x[0] = static_cast<char>(r.code) + 'A';
                     circle(img_viewer, r.ctr, 7, (r.diff > 0.0) ? SCA_RED : SCA_BLUE, 3);
+                    putText(img_viewer, std::string(x), r.ctr, FONT_HERSHEY_PLAIN, 2.0, SCA_GREEN, 2);
                 }
                 break;
             }
