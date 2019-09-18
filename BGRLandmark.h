@@ -82,7 +82,7 @@ public:
     void init(
         const int k = 9,
         const double thr_corr = 1.6,    // threshold for dual match (range is 0.0 to 2.0)
-        const int thr_pix_rng = 64,     // seek range of pixels > 1/4 of max pixel val (255)
+        const int thr_pix_rng = 51,     // seek range of pixels > 1/5 of max pixel val (255)
         const int thr_pix_min = 85);    // seek dark regions < 1/3 of max pixel val (255)
 
     void perform_match(
