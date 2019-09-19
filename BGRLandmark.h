@@ -23,7 +23,7 @@
 #ifndef BGR_LANDMARK_H_
 #define BGR_LANDMARK_H_
 
-// uncomment this to collect 1000 samples and write them to an image file when done
+// uncomment line below to collect up to 1000 samples and write them to an image file when done
 //#define _COLLECT_SAMPLES
 
 #include <map>
@@ -41,10 +41,10 @@ public:
         double diff;        // value of positive template match minus negative template match
         double rng;         // range of pixels in candidate ROI
         double min;         // min pixel in candidate ROI
-        int code;
+        int code;           // color code, -1 for unknown, else 0-11
     } landmark_info_t;
 
-    // names of colors with max and/or min BGR components
+    // names of colors with 0 or 255 as the BGR components
     enum class bgr_t : int
     {
         BLACK,
@@ -66,7 +66,7 @@ public:
         bgr_t c10;
     } grid_colors_t;
 
-    // there 8 colors with max/min BGR components
+    // there are 8 colors that only have 0 or 255 as the BGR components
     static const cv::Scalar BGR_COLORS[8];
     static const cv::Scalar BGR_BORDER;
 
@@ -79,20 +79,26 @@ public:
     BGRLandmark();
 	virtual ~BGRLandmark();
     
+    // init with good default settings
     void init(
         const int k = 9,
         const double thr_corr = 1.6,    // threshold for dual match (range is 0.0 to 2.0)
         const int thr_pix_rng = 51,     // seek range of pixels > 1/5 of max pixel val (255)
         const int thr_pix_min = 85);    // seek dark regions < 1/3 of max pixel val (255)
 
+    // runs the match on an original BGR image and possibly pre-processed gray image
+    // it returns a gray image with the raw template match and a vector of landmark info
     void perform_match(
         const cv::Mat& rsrc_bgr,
         const cv::Mat& rsrc,
         cv::Mat& rtmatch,
         std::vector<BGRLandmark::landmark_info_t>& rpts);
 
+    // gets centering offset for the landmark template
     const cv::Point& get_template_offset(void) const { return tmpl_offset; }
 
+    // normally color ID should always be enabled
+    // but it can be turned off for testing
     void set_color_id_enable(const bool f) { is_color_id_enabled = f; }
 
     
@@ -119,15 +125,18 @@ public:
 
 private:
 
-    // creates a 2x2 grid or "X" pattern BGR template of pixel dimension k
+    // creates a 2x2 grid BGR template of pixel dimension k
     static void create_template_image(
         cv::Mat& rimg,
         const int k,
         const grid_colors_t& rcolors);
 
+    // takes landmark info and snapshot of landmark
+    // and tries to identify the colors in the non-black squares
     void identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_info_t& rinfo) const;
 
-    static int BGRLandmark::get_bgr_code(double s, const int a, const int b);
+    // converts the "sign" of the landmark and its 2 bright colors into a single code
+    static int get_bgr_code(double s, const int a, const int b);
 
 
 private:
@@ -147,6 +156,7 @@ private:
     // offset for centering template location
     cv::Point tmpl_offset;
 
+    // flag for controlling color ID function
     bool is_color_id_enabled;
 
 #ifdef _COLLECT_SAMPLES

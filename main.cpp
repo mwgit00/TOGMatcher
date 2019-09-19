@@ -612,14 +612,16 @@ void test_patt_rec()
 
 int main(int argc, char** argv)
 {
-    //test_patt_rec();
+    // uncomment line below to test the PCA and DCT stuff and quit
+    //test_patt_rec(); return 0;
 
+// change 0 to 1 to switch test loops
 #if 0
     // test BGRLandmark
     loop2();
 #else
     // test TOGMatcher
-    // add some pre-processing blurring, add some template blurring, turn on mask option
+    // try setting pre-blur kernel size to 5, template kernel size to 5, and enable masking
     loop();
 #endif
     return 0;

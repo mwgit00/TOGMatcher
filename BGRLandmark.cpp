@@ -69,28 +69,6 @@ static T apply_rail(const T v, const T vmin, const T vmax)
 
 
 
-// this only works if a and b are both 0,1,2 and a != b
-static int get_bgr_code(double s, const int a, const int b)
-{
-    int code = 0;
-    if (a == 0)
-    {
-        code = (b == 1) ? 0 : 1;  // 0,1 or 0,2
-    }
-    else if (a == 1)
-    {
-        code = (b == 0) ? 2 : 3;  // 1,0 or 1,2
-    }
-    else
-    {
-        code = (b == 0) ? 4 : 5;  // 2,0 or 2,1
-    }
-    if (s < 0.0) code += 6;
-    return code;
-}
-
-
-
 BGRLandmark::BGRLandmark()
 {
     init();
@@ -409,9 +387,9 @@ void BGRLandmark::identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_inf
     int result = -1;
     const cv::Vec3f norm_ycm[3] =
     {
-        {0, 1, 1},  // 0GR yellow
-        {1, 0, 1},  // B0R magenta
-        {1, 1, 0},  // BG0 cyan 
+        {0, 1, 1},  // 0,G,R yellow
+        {1, 0, 1},  // B,0,R magenta
+        {1, 1, 0},  // B,G,0 cyan 
     };
 
     cv::Vec3f p0;
@@ -431,7 +409,7 @@ void BGRLandmark::identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_inf
         p1 = rimg.at<cv::Vec3b>(kdim - 1, kdim - 1);
     }
 
-    // get ranges for corners
+    // get pixel value ranges for corners
     double p0max, p0min, p0rng;
     double p1max, p1min, p1rng;
     cv::minMaxLoc(p0, &p0min, &p0max);
@@ -439,11 +417,12 @@ void BGRLandmark::identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_inf
     p0rng = p0max - p0min;
     p1rng = p1max - p1min;
 
-    // then normalize the BGR components
+    // then normalize the BGR components for each corner
+    // each value will fall in range 0-1
     cv::normalize(p0, p0, 0, 1, cv::NORM_MINMAX);
     cv::normalize(p1, p1, 0, 1, cv::NORM_MINMAX);
 
-    // this BGR "score" will range from 1 to 2
+    // this BGR "score" (sum of all components) should range from 1 to 2
     // something in the middle means a yellow-magenta-cyan match can be performed
     double s0 = p0[0] + p0[1] + p0[2];
     double s1 = p1[0] + p1[1] + p1[2];
@@ -476,7 +455,8 @@ void BGRLandmark::identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_inf
 
 int BGRLandmark::get_bgr_code(double s, const int a, const int b)
 {
-    // a and b must be in range [0,1,2] and not equal
+    // a and b must be in range [0,1,2] and must not be equal
+    // otherwise the code conversion won't work
     int code = -1;
     if ((a != b) && (a >= 0) && (a <= 2) && (b >= 0) && (b <= 2))
     {
