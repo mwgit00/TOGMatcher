@@ -77,7 +77,7 @@ public:
 public:
 
     BGRLandmark();
-	virtual ~BGRLandmark();
+    virtual ~BGRLandmark();
     
     // init with good default settings
     void init(
@@ -111,14 +111,18 @@ public:
         const cv::Scalar border_color = BGR_BORDER,
         const int dpi = 96);
 
-    // creates printable checkerboard by repeating a 2x2 landmark pattern
-    static void create_checkerboard_image(
+    // creates printable multi-landmark image by repeating 2x2 landmark patterns
+    // they are placed in row-major order in the image based on the repeat counts
+    // the labels identify each landmark, cycling back around if necessary
+    // it's up to the user to pick sane dimensions and repeat counts
+    static void create_multi_landmark_image(
         cv::Mat& rimg,
+        const std::string& rslabels,
         const int xrepeat,
         const int yrepeat,
-        const double dim_grid = 2.0,
+        const double dim_grid = 1.0,
+        const double dim_spacing = 2.0,
         const double dim_border = 0.25,
-        const grid_colors_t& rcolors = { bgr_t::BLACK, bgr_t::WHITE, bgr_t::BLACK, bgr_t::WHITE },
         const cv::Scalar border_color = BGR_BORDER,
         const int dpi = 96);
 

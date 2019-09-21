@@ -73,7 +73,6 @@ BGRLandmark::BGRLandmark()
 {
     init();
 #ifdef _DEBUG
-    cv::Mat img2;
     for (int i = 0; i < 12; i++)
     {
         cv::Mat img1;
@@ -82,8 +81,11 @@ BGRLandmark::BGRLandmark()
         create_landmark_image(img1, 3.0, 0.25, PATTERN_MAP.find(c)->second, { 255,255,255 });
         cv::imwrite(s, img1);
     }
-    create_checkerboard_image(img2, 3, 5, 0.5, 0.25, PATTERN_MAP.find('L')->second);
-    cv::imwrite("dbg_bgrcb.png", img2);
+    cv::Mat img2;
+    create_multi_landmark_image(img2, "ABCDEFGHIJKL", 4, 3, 0.5, 2.25, 0.25, { 240,240,240 });
+    cv::imwrite("dbg_multi.png", img2);
+    create_multi_landmark_image(img2, "AG", 2, 1, 0.5, 8, 0.0);
+    cv::imwrite("dbg_double.png", img2);
 #endif
 }
 
@@ -291,47 +293,62 @@ void BGRLandmark::create_landmark_image(
 
 
 
-void BGRLandmark::create_checkerboard_image(
+// creates printable multi-landmark image by repeating 2x2 landmark patterns
+void BGRLandmark::create_multi_landmark_image(
     cv::Mat& rimg,
+    const std::string& rslabels,
     const int xrepeat,
     const int yrepeat,
     const double dim_grid,
+    const double dim_spacing,
     const double dim_border,
-    const grid_colors_t& rcolors,
     const cv::Scalar border_color,
     const int dpi)
 {
-    // set limits on 2x2 grid size (0.5 inch to 2.0 inch)
-    double dim_grid_fix = apply_rail<double>(dim_grid, 0.5, 2.0);
+    // set limits on 2x2 grid size (0.25 inch to 2.0 inch)
+    double dim_grid_fix = apply_rail<double>(dim_grid, 0.25, 2.0);
+
+    // set limits on inter-grid spacing (0.25 inch to 8.0 inch)
+    double dim_spacing_fix = apply_rail<double>(dim_spacing, 0.25, 8.0);
 
     // set limits on size of border (0 inches to 1 inch)
     double dim_border_fix = apply_rail<double>(dim_border, 0.0, 1.0);
 
     const int kgrid = static_cast<int>(dim_grid_fix * dpi);
+    const int kspacing = static_cast<int>(dim_spacing_fix * dpi);
     const int kborder = static_cast<int>(dim_border_fix * dpi);
+    const int kborder2 = 2 * kborder;
 
     // set arbitrary limits on repeat counts
-    int xrfix = apply_rail<int>(xrepeat, 2, 8);
-    int yrfix = apply_rail<int>(yrepeat, 2, 8);
+    int xrfix = apply_rail<int>(xrepeat, 1, 8);
+    int yrfix = apply_rail<int>(yrepeat, 1, 8);
 
-    // create a 2x2 grid with no border
-    // this will be replicated in the checkerboard
-    cv::Mat img_grid;
-    create_landmark_image(img_grid, dim_grid_fix, 0.0, rcolors, {}, dpi);
-
-    // repeat the block pattern
-    cv::Mat img_reps = cv::repeat(img_grid, yrfix, xrfix);
-
-    // create image that will contain border and grid
-    // fill it with border color
-    const int kbx = (kborder * 2) + img_reps.size().width;
-    const int kby = (kborder * 2) + img_reps.size().height;
+    // create image that will contain border and the multiple landmarks
+    // then fill in border and white background for landmarks
+    const int kbx = (((xrfix - 1) * kspacing) + kgrid) + kborder2;
+    const int kby = (((yrfix - 1) * kspacing) + kgrid) + kborder2;
     rimg = cv::Mat::zeros({ kbx, kby }, CV_8UC3);
     cv::rectangle(rimg, { 0, 0, kbx, kby }, border_color, -1);
+    cv::rectangle(rimg, { kborder, kborder, kbx - kborder2, kby - kborder2 }, { 255,255,255 }, -1);
 
-    // copy repeated block pattern into image
-    cv::Rect roi(cv::Point(kborder, kborder), img_reps.size());
-    img_reps.copyTo(rimg(roi));
+    // draw the landmarks into the image
+    // cycle through the label character string to pick current landmark pattern
+    int k = 0;
+    int kmax = rslabels.size();
+    for (int j = 0; j < yrfix; j++)
+    {
+        for (int i = 0; i < xrfix; i++)
+        {
+            cv::Mat img;
+            char c = (kmax) ? rslabels.at(k % kmax) : 'A';
+            create_landmark_image(img, dim_grid_fix, 0.0, PATTERN_MAP.find(c)->second);
+            int offseti = kborder + (i * kspacing);
+            int offsetj = kborder + (j * kspacing);
+            cv::Rect roi = { offseti, offsetj, kgrid, kgrid };
+            img.copyTo(rimg(roi));
+            k++;
+        }
+    }
 }
 
 
