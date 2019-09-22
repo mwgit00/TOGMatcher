@@ -28,14 +28,14 @@
 
 const cv::Scalar BGRLandmark::BGR_COLORS[8] =
 {
-    cv::Scalar(0, 0, 0),
-    cv::Scalar(0, 0, 255),
-    cv::Scalar(0, 255, 0),
-    cv::Scalar(0, 255, 255),
-    cv::Scalar(255, 0, 0),
-    cv::Scalar(255, 0, 255),
-    cv::Scalar(255, 255, 0),
-    cv::Scalar(255, 255, 255),
+    cv::Scalar(0, 0, 0),        // black
+    cv::Scalar(0, 0, 255),      // red
+    cv::Scalar(0, 255, 0),      // green
+    cv::Scalar(0, 255, 255),    // yellow
+    cv::Scalar(255, 0, 0),      // blue
+    cv::Scalar(255, 0, 255),    // magenta
+    cv::Scalar(255, 255, 0),    // cyan
+    cv::Scalar(255, 255, 255),  // white
 };
 
 const cv::Scalar BGRLandmark::BGR_BORDER = { 128, 128, 128 };
@@ -82,7 +82,7 @@ BGRLandmark::BGRLandmark()
         cv::imwrite(s, img1);
     }
     cv::Mat img2;
-    create_multi_landmark_image(img2, "ABCDEFGHIJKL", 4, 3, 0.5, 2.25, 0.25, { 240,240,240 });
+    create_multi_landmark_image(img2, "ADGJBEHKCFIL", 4, 3, 0.5, 2.25, 0.25, { 192,192,192 });
     cv::imwrite("dbg_multi.png", img2);
     create_multi_landmark_image(img2, "AG", 2, 1, 0.5, 8, 0.0);
     cv::imwrite("dbg_double.png", img2);
@@ -104,7 +104,8 @@ void BGRLandmark::init(
     const int k,
     const double thr_corr,
     const int thr_pix_rng,
-    const int thr_pix_min)
+    const int thr_pix_min,
+    const int thr_bgr_rng)
 {
     // fix k to be odd and in range 9-15
     int fixk = ((k / 2) * 2) + 1;
@@ -115,6 +116,7 @@ void BGRLandmark::init(
     this->thr_corr = thr_corr;
     this->thr_pix_rng = thr_pix_rng;
     this->thr_pix_min = thr_pix_min;
+    this->thr_bgr_rng = thr_bgr_rng;
 
     // create the B&W matching templates
     const grid_colors_t colors = PATTERN_MAP.find('0')->second;
@@ -444,26 +446,21 @@ void BGRLandmark::identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_inf
     double s0 = p0[0] + p0[1] + p0[2];
     double s1 = p1[0] + p1[1] + p1[2];
 
-    // see if there's enough contribution from two channels
-    // to qualify as valid yellow-magenta-cyan classification
-    // these thresholds are pretty low but can help filter out false positives
-    // TODO -- maybe make these tunable
-    double bgr_norm_thr = 1.2;
-    double bgr_rng_thr = 20;
-    if ((s0 > bgr_norm_thr) && (s1 > bgr_norm_thr) && (p0rng > bgr_rng_thr) && (p1rng > bgr_rng_thr))
+    // see if there's enough range in BGR components
+    // for a valid yellow-magenta-cyan classification
+    if ((p0rng > thr_bgr_rng) && (p1rng > thr_bgr_rng))
     {
-        // find closest color match
-        double q0min = 3.0;
-        double q1min = 3.0;
+        const double BGR_EPS = 1.0e-6;
         int nc0 = -1;
         int nc1 = -1;
-        for (int i = 0; i < 3; i++)
-        {
-            double q0 = cv::norm(p0, norm_ycm[i], cv::NORM_L2);
-            double q1 = cv::norm(p1, norm_ycm[i], cv::NORM_L2);
-            if (q0 < q0min) { q0min = q0; nc0 = i; }
-            if (q1 < q1min) { q1min = q1; nc1 = i; }
-        }
+        // classify yellow-magenta-cyan for the two colored corner pixels
+        // by determing which component is a "absent" or minimum (normalized to 0)
+        if (p0[0] < BGR_EPS) nc0 = 0;
+        if (p0[1] < BGR_EPS) nc0 = 1;
+        if (p0[2] < BGR_EPS) nc0 = 2;
+        if (p1[0] < BGR_EPS) nc1 = 0;
+        if (p1[1] < BGR_EPS) nc1 = 1;
+        if (p1[2] < BGR_EPS) nc1 = 2;
         rinfo.code = get_bgr_code(rinfo.diff, nc0, nc1);
     }
 }
