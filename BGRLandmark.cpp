@@ -226,7 +226,7 @@ void BGRLandmark::perform_match(
                 // use bilateral filter to suppress as much noise as possible in ROI
                 // while also preserving sharp edges
                 cv::Mat img_roi_bgr_proc;
-                cv::bilateralFilter(img_roi_bgr, img_roi_bgr_proc, 3, 200, 200);
+                cv::bilateralFilter(img_roi_bgr, img_roi_bgr_proc, 5, 200, 200);
                 identify_colors(img_roi_bgr_proc, lminfo);
 
                 // save it if color test gave a sane result
@@ -283,9 +283,9 @@ void BGRLandmark::create_landmark_image(
     cv::Mat img_grid = cv::Mat::zeros({ kgrid, kgrid }, CV_8UC3);
 
     // fill in 2x2 blocks (clockwise from upper left)
-    cv::rectangle(img_grid, { 0, 0, kgridh - 1, kgridh - 1 }, colors[0], -1);
+    cv::rectangle(img_grid, { 0, 0, kgridh, kgridh }, colors[0], -1);
     cv::rectangle(img_grid, { kgridh, 0, kgridh, kgridh }, colors[1], -1);
-    cv::rectangle(img_grid, { kgridh, kgridh, kgrid - 1, kgrid - 1 }, colors[2], -1);
+    cv::rectangle(img_grid, { kgridh, kgridh, kgridh, kgridh }, colors[2], -1);
     cv::rectangle(img_grid, { 0, kgridh, kgridh, kgridh }, colors[3], -1);
 
     // copy grid into image with border

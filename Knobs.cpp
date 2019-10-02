@@ -27,6 +27,7 @@
 
 Knobs::Knobs() :
     is_op_required(false),
+    is_cal_enabled(false),
     is_equ_hist_enabled(false),
     is_mask_enabled(false),
     is_record_enabled(false),
@@ -70,6 +71,7 @@ void Knobs::show_help(void) const
     std::cout << "]   Increase image scale" << std::endl;
     std::cout << "{   Decrease Sobel kernel size" << std::endl;
     std::cout << "}   Increase Sobel kernel size" << std::endl;
+    std::cout << "c   Toggle calibration image grab mode for BGRLandmark" << std::endl;
     std::cout << "e   Toggle histogram equalization" << std::endl;
     std::cout << "m   Toggle mask mode for template matching" << std::endl;
     std::cout << "r   Toggle recording mode" << std::endl;
@@ -159,6 +161,12 @@ void Knobs::handle_keypress(const char ckey)
             dec_ksize();
             is_op_required = true;
             op_id = Knobs::OP_KSIZE;
+            break;
+        }
+        case 'c':
+        {
+            toggle_cal_enabled();
+            std::cout << "BGRLandmark CAL=" << is_cal_enabled << std::endl;
             break;
         }
         case 'e':

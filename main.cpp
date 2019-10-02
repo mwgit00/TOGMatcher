@@ -29,6 +29,7 @@
 #include <fstream>
 #include <sstream>
 #include <iomanip>
+#include <set>
 
 #include "PatternRec.h"
 #include "BGRLandmark.h"
@@ -215,9 +216,16 @@ void reload_template(TOGMatcher& rtogm, const T_file_info& rinfo, const int ksiz
 
 void loop2(void)
 {
+    const int max_good_ct = 20;
+
     Knobs theKnobs;
     int op_id;
 
+    std::ofstream ofs_cal;
+    std::set<int> lm_labels;
+    int cal_good_ct;
+    int cal_ct;
+    
     double qmax;
     Size capture_size;
     Point ptmax;
@@ -227,10 +235,6 @@ void loop2(void)
     Mat img_gray;
     Mat img_channels[3];
     Mat tmatch;
-
-    Mat img_cx_bgr;// = imread(".\\foobgrcb.png", cv::IMREAD_COLOR);
-    //Mat img_cx_bgr;
-    //cvtColor(img_cx_bgr, img_cx_bgr, COLOR_BGR2YUV);
 
 	BGRLandmark bgrm;
 	Ptr<CLAHE> pCLAHE = createCLAHE();
@@ -252,6 +256,8 @@ void loop2(void)
 	// use dummy operation to print initial Knobs settings message
 	// and force template to be loaded at start of loop
 	theKnobs.handle_keypress('0');
+
+    ofs_cal.open("cal_meta.txt");
 
     // and the image processing loop is running...
     bool is_running = true;
@@ -313,13 +319,57 @@ void loop2(void)
         {
             case Knobs::OUT_AUX:
             {
-                // draw circles around all BGR landmarks
+                // draw circles around all BGR landmarks and put labels by each one
+                // unless about to snap a calibration image which can't have the circles
+                lm_labels.clear();
                 for (const auto& r : qinfo)
                 {
-                    char x[2] = { 0 };
-                    x[0] = static_cast<char>(r.code) + 'A';
-                    circle(img_viewer, r.ctr, 7, (r.diff > 0.0) ? SCA_RED : SCA_BLUE, 3);
-                    putText(img_viewer, std::string(x), r.ctr, FONT_HERSHEY_PLAIN, 2.0, SCA_GREEN, 2);
+                    lm_labels.insert(r.code);
+                    if ((cal_good_ct < (max_good_ct - 3)) || (cal_good_ct >= max_good_ct))
+                    {
+                        char x[2] = { 0 };
+                        x[0] = static_cast<char>(r.code) + 'A';
+                        circle(img_viewer, r.ctr, 7, (r.diff > 0.0) ? SCA_RED : SCA_BLUE, 3);
+                        putText(img_viewer, std::string(x), r.ctr, FONT_HERSHEY_PLAIN, 2.0, SCA_GREEN, 2);
+                    }
+                }
+
+                // in this loop, use mask flag as calibration grab mode
+                // the image is dumped to file if 12 unique landmarks found (3x4 pattern)
+                // then user must "hide" some landmarks to trigger another grab
+                if (theKnobs.get_cal_enabled())
+                {
+                    if (lm_labels.size() == 12)
+                    {
+                        if (cal_good_ct < max_good_ct)
+                        {
+                            cal_good_ct++;
+                            if (cal_good_ct == max_good_ct)
+                            {
+                                std::ostringstream osx;
+                                osx << MOVIE_PATH << "img_" << std::setfill('0') << std::setw(5) << cal_ct << ".png";
+                                std::string sfile = osx.str();
+                                imwrite(sfile, img_viewer);
+                                std::cout << "CALIB. SNAP " << sfile << std::endl;
+                                ofs_cal << sfile << std::endl;
+                                for (const auto& r : qinfo)
+                                {
+                                    ofs_cal << r.code << " " << r.ctr << std::endl;
+                                }
+                                cal_ct++;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        cal_good_ct = 0;
+                    }
+                }
+                else
+                {
+                    // calibration mode turned off
+                    cal_good_ct = 0;
+                    cal_ct = 0;
                 }
                 break;
             }
@@ -370,6 +420,7 @@ void loop2(void)
     // when everything is done, release the capture device and windows
     vcap.release();
     cv::destroyAllWindows();
+    ofs_cal.close();
 }
 
 

@@ -58,6 +58,9 @@ public:
 
     bool get_op_flag(int& ropid);
 
+    bool get_cal_enabled(void) const { return is_cal_enabled; }
+    void toggle_cal_enabled(void) { is_cal_enabled = !is_cal_enabled; }
+
     bool get_equ_hist_enabled(void) const { return is_equ_hist_enabled; }
     void toggle_equ_hist_enabled(void) { is_equ_hist_enabled = !is_equ_hist_enabled; }
 
@@ -96,6 +99,9 @@ private:
     // One-shot flag for signaling when extra operation needs to be done
     // before continuing image processing loop
     bool is_op_required;
+
+    // Flag for enabling calibration image grab mode for BGRLandmark loop
+    bool is_cal_enabled;
 
     // Flag for enabling histogram equalization
     bool is_equ_hist_enabled;

@@ -79,13 +79,13 @@ public:
     BGRLandmark();
     virtual ~BGRLandmark();
     
-    // init with good default settings
+    // init with "good" default settings
     void init(
         const int k = 9,
         const double thr_corr = 1.6,    // threshold for dual match (range is 0.0 to 2.0)
-        const int thr_pix_rng = 51,     // seek range of pixels > 1/5 of max pixel val (255)
-        const int thr_pix_min = 85,     // seek dark regions < 1/3 of max pixel val (255)
-        const int thr_bgr_rng = 25);    // range in BGR required for color matching step
+        const int thr_pix_rng = 40,     // grey image pixel range threshold for pre-proc
+        const int thr_pix_min = 70,     // grey image dark pixel threshold for pre-proc
+        const int thr_bgr_rng = 20);    // range in BGR required for color matching step
 
     // runs the match on an original BGR image and possibly pre-processed gray image
     // it returns a gray image with the raw template match and a vector of landmark info
