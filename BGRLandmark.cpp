@@ -226,7 +226,7 @@ void BGRLandmark::perform_match(
                 // use bilateral filter to suppress as much noise as possible in ROI
                 // while also preserving sharp edges
                 cv::Mat img_roi_bgr_proc;
-                cv::bilateralFilter(img_roi_bgr, img_roi_bgr_proc, 5, 200, 200);
+                cv::bilateralFilter(img_roi_bgr, img_roi_bgr_proc, 3, 200, 200);
                 identify_colors(img_roi_bgr_proc, lminfo);
 
                 // save it if color test gave a sane result

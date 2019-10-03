@@ -221,8 +221,10 @@ void loop2(void)
     Knobs theKnobs;
     int op_id;
 
-    std::ofstream ofs_cal;
-    std::set<int> lm_labels;
+    cv::FileStorage cvfs;
+    std::vector<std::vector<cv::Vec2f>> vvcal;
+    std::vector<std::string> vcalfiles;
+    std::set<int> cal_label_set;
     int cal_good_ct;
     int cal_ct;
     
@@ -257,7 +259,7 @@ void loop2(void)
 	// and force template to be loaded at start of loop
 	theKnobs.handle_keypress('0');
 
-    ofs_cal.open("cal_meta.txt");
+    cvfs.open("cal_meta.yaml", cv::FileStorage::WRITE);
 
     // and the image processing loop is running...
     bool is_running = true;
@@ -321,10 +323,10 @@ void loop2(void)
             {
                 // draw circles around all BGR landmarks and put labels by each one
                 // unless about to snap a calibration image which can't have the circles
-                lm_labels.clear();
+                cal_label_set.clear();
                 for (const auto& r : qinfo)
                 {
-                    lm_labels.insert(r.code);
+                    cal_label_set.insert(r.code);
                     if ((cal_good_ct < (max_good_ct - 3)) || (cal_good_ct >= max_good_ct))
                     {
                         char x[2] = { 0 };
@@ -339,23 +341,29 @@ void loop2(void)
                 // then user must "hide" some landmarks to trigger another grab
                 if (theKnobs.get_cal_enabled())
                 {
-                    if (lm_labels.size() == 12)
+                    if (cal_label_set.size() == 12)
                     {
                         if (cal_good_ct < max_good_ct)
                         {
                             cal_good_ct++;
                             if (cal_good_ct == max_good_ct)
                             {
+                                // save image file
                                 std::ostringstream osx;
                                 osx << MOVIE_PATH << "img_" << std::setfill('0') << std::setw(5) << cal_ct << ".png";
                                 std::string sfile = osx.str();
                                 imwrite(sfile, img_viewer);
+                                vcalfiles.push_back(sfile);
                                 std::cout << "CALIB. SNAP " << sfile << std::endl;
-                                ofs_cal << sfile << std::endl;
+
+                                // sort image points by label code
+                                std::vector<cv::Vec2f> vimgpts;
+                                std::sort(qinfo.begin(), qinfo.end(), BGRLandmark::compare_by_code);
                                 for (const auto& r : qinfo)
                                 {
-                                    ofs_cal << r.code << " " << r.ctr << std::endl;
+                                    vimgpts.push_back(cv::Vec2f(r.ctr.x, r.ctr.y));
                                 }
+                                vvcal.push_back(vimgpts);
                                 cal_ct++;
                             }
                         }
@@ -420,7 +428,10 @@ void loop2(void)
     // when everything is done, release the capture device and windows
     vcap.release();
     cv::destroyAllWindows();
-    ofs_cal.close();
+
+    // dump cal data
+    cvfs << "files" << vcalfiles;
+    cvfs << "points" << vvcal;
 }
 
 
@@ -666,8 +677,16 @@ int main(int argc, char** argv)
     // uncomment line below to test the PCA and DCT stuff and quit
     //test_patt_rec(); return 0;
 
+    // uncomment lines below to test reading back cal data
+    //std::vector<std::vector<cv::Vec2f>> vvcal;
+    //std::vector<std::string> vcalfiles;
+    //cv::FileStorage cvfs;
+    //cvfs.open("cal_meta.yaml", cv::FileStorage::READ);
+    //cvfs["files"] >> vcalfiles;
+    //cvfs["points"] >> vvcal;
+
 // change 0 to 1 to switch test loops
-#if 0
+#if 1
     // test BGRLandmark
     loop2();
 #else

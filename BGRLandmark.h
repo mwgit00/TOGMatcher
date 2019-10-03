@@ -73,7 +73,6 @@ public:
     // the supported landmark color patterns
     static const std::map<char, grid_colors_t> PATTERN_MAP;
 
-
 public:
 
     BGRLandmark();
@@ -127,6 +126,8 @@ public:
         const cv::Scalar border_color = BGR_BORDER,
         const int dpi = 96);
 
+    static int compare_by_code(BGRLandmark::landmark_info_t& a, BGRLandmark::landmark_info_t& b)
+        { return a.code < b.code; }
 
 private:
 
