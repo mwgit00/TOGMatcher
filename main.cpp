@@ -429,9 +429,31 @@ void loop2(void)
     vcap.release();
     cv::destroyAllWindows();
 
-    // dump cal data
-    cvfs << "files" << vcalfiles;
-    cvfs << "points" << vvcal;
+    // dump cal data if still in cal mode
+    if (theKnobs.get_cal_enabled())
+    {
+        // the BGRLandmark calibration pattern has 12 corners A-L in ordering shown below
+        // so the corners array must be initialized in same order
+        // A D G J
+        // B E H K
+        // C F I L
+        std::vector<Point3f> vgridpts;
+        double grid_square = 2.25;
+        Size board_size(4, 3);
+        for (int j = 0; j < board_size.width; j++)
+        {
+            for (int i = 0; i < board_size.height; i++)
+            {
+                vgridpts.push_back(cv::Point3f(float(j * grid_square), float(i * grid_square), 0));
+            }
+        }
+        cvfs << "image_size" << capture_size;
+        cvfs << "grid_size" << board_size;
+        cvfs << "grid_square" << grid_square;
+        cvfs << "grid_pts" << vgridpts;
+        cvfs << "files" << vcalfiles;
+        cvfs << "points" << vvcal;
+    }
 }
 
 
