@@ -40,17 +40,17 @@ public:
     int dim(void) const { return kdim; }
     size_t fvsize(void) const { return kfvsize; }
 
-    // convert 2D pattern to DCT (32-bit floating point)
-    void pattern_to_dct_32F(const cv::Mat& rimg, cv::Mat& rdct32F) const;
+    // convert 2D pattern to DCT (64-bit floating point)
+    void pattern_to_dct_64F(const cv::Mat& rimg, cv::Mat& rdct64F) const;
 
     // convert 2D pattern to DCT (8-bit unsigned)
     void pattern_to_dct_8U(const cv::Mat& rimg, cv::Mat& rdct8U) const;
 
     // convert 2D pattern into a feature vector
-    void pattern_to_features(const cv::Mat& rimg, std::vector<float>& rfv) const;
+    void pattern_to_features(const cv::Mat& rimg, std::vector<double>& rfv) const;
 
     // reconstruct 2D pattern from a feature vector
-    void features_to_pattern(const std::vector<float>& rfv, cv::Mat& rimg) const;
+    void features_to_pattern(const std::vector<double>& rfv, cv::Mat& rimg) const;
 
     const std::vector<cv::Point>& get_zigzag_pts(void) const { return vzigzagpts; }
 

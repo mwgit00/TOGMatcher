@@ -655,23 +655,64 @@ void test_patt_rec()
     // dump all the samples...
     prfoo.save_samples_to_csv("train_all");
     
-    // run PCA with 0.96 variance threshold
-    // testing shows this reduces the components down to 9
-    // which is symmetrical in the upper left corner of the 8x8 DCT image
-    PatternRec::run_csv_to_pca("train_all_p.csv", "train_all_pca.yaml", 0.96);
+    if (false)
+    {
+        // for 8x8 DCT, components 1-20
+        // run PCA with 0.96 variance threshold
+        // testing shows this reduces the components down to 9
+        // which is symmetrical in the upper left corner of the 8x8 DCT image
+        PatternRec::run_csv_to_pca("train_all_p.csv", "train_all_pca.yaml", 0.96);
 
-    cv::PCA mypca;
-    PatternRec::load_pca("train_all_pca.yaml", mypca);
-    
-    // test PCA project and back-project to get back DCT components
-    cv::Mat samp_pca = mypca.project(prfoo.get_p_sample(988));
-    cv::Mat samp_dct = mypca.backProject(samp_pca);
+        cv::PCA mypca;
+        PatternRec::load_pca("train_all_pca.yaml", mypca);
 
-    // convert components back to image
-    // this better look like a checker board corner
-    cv::Mat img_test;
-    prfoo.get_dct_fv().features_to_pattern(samp_dct, img_test);
-    cv::imwrite("dbg_test_pca.png", img_test);
+        // test PCA project and back-project to get back DCT components
+        cv::Mat samp_pca = mypca.project(prfoo.get_p_sample(88/*988*/));
+        cv::Mat samp_dct = mypca.backProject(samp_pca);
+
+        // convert components back to image
+        // this better look like a checker board corner
+        cv::Mat img_test;
+        prfoo.get_dct_fv().features_to_pattern(samp_dct, img_test);
+        cv::imwrite("dbg_test_pca.png", img_test);
+    }
+
+    if (true)
+    {
+        cv::Mat img_p;
+        cv::Mat mean_p;
+        cv::Mat covar_p;
+
+        cv::Mat img_n;
+        cv::Mat mean_n;
+        cv::Mat covar_n;
+
+        cv::Mat covar_inv_p;
+        cv::Mat covar_inv_n;
+
+        PatternRec::read_csv_into_mat("train_all_p.csv", img_p);
+        cv::calcCovarMatrix(img_p, covar_p, mean_p, COVAR_ROWS | COVAR_NORMAL);
+
+        PatternRec::read_csv_into_mat("train_all_n.csv", img_n);
+        cv::calcCovarMatrix(img_n, covar_n, mean_n, COVAR_ROWS | COVAR_NORMAL);
+
+        cv::invert(covar_p, covar_inv_p, DECOMP_SVD);
+        cv::invert(covar_n, covar_inv_n, DECOMP_SVD);
+
+        for (size_t ii = 0; ii < 20; ii++)
+        {
+            std::cout << cv::Mahalanobis(prfoo.get_0_sample(ii), mean_p, covar_inv_p) << ", ";
+            std::cout << cv::Mahalanobis(prfoo.get_0_sample(ii), mean_n, covar_inv_n) << ",  ";
+
+            std::cout << cv::Mahalanobis(prfoo.get_p_sample(ii), mean_p, covar_inv_p) << ", ";
+            std::cout << cv::Mahalanobis(prfoo.get_p_sample(ii), mean_n, covar_inv_n) << ",  ";
+
+            std::cout << cv::Mahalanobis(prfoo.get_n_sample(ii), mean_p, covar_inv_p) << ", ";
+            std::cout << cv::Mahalanobis(prfoo.get_n_sample(ii), mean_n, covar_inv_n) << std::endl;
+        }
+
+        std::cout << "done" << std::endl;
+    }
 }
 
 

@@ -28,7 +28,7 @@
 
 
 
-PatternRec::PatternRec() : dct_fv(8, 1, 20)
+PatternRec::PatternRec() : dct_fv(8, 1, 14)
 {
 }
 
@@ -103,7 +103,7 @@ bool PatternRec::read_csv_into_mat(const std::string& rs, cv::Mat& rimg)
             std::istringstream iss(s);
             while (!iss.eof() && is_ok)
             {
-                float val;
+                double val;
                 iss >> val;
                 one_row.push_back(val);
             }
@@ -129,10 +129,10 @@ bool PatternRec::read_csv_into_mat(const std::string& rs, cv::Mat& rimg)
 
 
 
-void PatternRec::spew_float_vecs_to_csv(
+void PatternRec::spew_double_vecs_to_csv(
     const std::string& rs,
     const std::string& rsuffix,
-    std::vector<std::vector<float>>& rvv)
+    std::vector<std::vector<double>>& rvv)
 {
     std::ofstream ofs;
     std::string sname = rs + rsuffix + ".csv";
@@ -187,7 +187,6 @@ bool PatternRec::load_samples_from_img(
     cv::Size sz_roi = cv::Size(sz_box.width - 4, sz_box.height - 4);
     cv::Point ctr{ sz_roi.width / 2, sz_roi.height / 2 };
     kdim = sz_roi.width;
-    krad = kdim / 2;
 
     // now that dimension is known a BGRLandmark matcher can be created
     cpoz::BGRLandmark bgrm;
@@ -195,9 +194,9 @@ bool PatternRec::load_samples_from_img(
     bgrm.set_color_id_enable(false);
 
     // temporary vectors for the data...
-    std::vector<std::vector<float>> vvp;
-    std::vector<std::vector<float>> vvn;
-    std::vector<std::vector<float>> vv0;
+    std::vector<std::vector<double>> vvp;
+    std::vector<std::vector<double>> vvn;
+    std::vector<std::vector<double>> vv0;
 
     // loop through all the sample images...
     for (int j = 0; j < SAMP_NUM_Y; j++)
@@ -219,7 +218,7 @@ bool PatternRec::load_samples_from_img(
             std::vector<cpoz::BGRLandmark::landmark_info_t> lminfo;
             bgrm.perform_match(img(roi), img_roi, img_match, lminfo);
 
-            std::vector<float> vfeature;
+            std::vector<double> vfeature;
             dct_fv.pattern_to_features(img_roi, vfeature);
 
             // stick feature vector in appropriate structure
@@ -267,7 +266,7 @@ bool PatternRec::load_samples_from_img(
 
 void PatternRec::save_samples_to_csv(const std::string& rsprefix)
 {
-    spew_float_vecs_to_csv(rsprefix, "_p", _vvp);
-    spew_float_vecs_to_csv(rsprefix, "_n", _vvn);
-    spew_float_vecs_to_csv(rsprefix, "_0", _vv0);
+    spew_double_vecs_to_csv(rsprefix, "_p", _vvp);
+    spew_double_vecs_to_csv(rsprefix, "_n", _vvn);
+    spew_double_vecs_to_csv(rsprefix, "_0", _vv0);
 }

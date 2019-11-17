@@ -46,17 +46,17 @@ DCTFeature::~DCTFeature()
 
 
 
-void DCTFeature::pattern_to_dct_32F(const cv::Mat& rimg, cv::Mat& rdct32F) const
+void DCTFeature::pattern_to_dct_64F(const cv::Mat& rimg, cv::Mat& rdct64F) const
 {
     // make a square image
-    // convert to float in -128 to 127 range
+    // convert to double in -128 to 127 range
     // then run DCT on it (just like a JPEG block)
     cv::Mat img_src;
-    cv::Mat img_src_32F;
+    cv::Mat img_src_64F;
     cv::resize(rimg, img_src, { kdim, kdim });
-    img_src.convertTo(img_src_32F, CV_32F);
-    img_src_32F -= 128.0;
-    cv::dct(img_src_32F, rdct32F, 0);
+    img_src.convertTo(img_src_64F, CV_64F);
+    img_src_64F -= 128.0;
+    cv::dct(img_src_64F, rdct64F, 0);
 }
 
 
@@ -64,33 +64,33 @@ void DCTFeature::pattern_to_dct_32F(const cv::Mat& rimg, cv::Mat& rdct32F) const
 void DCTFeature::pattern_to_dct_8U(const cv::Mat& rimg, cv::Mat& rdct8U) const
 {
     cv::Mat img_dct;
-    pattern_to_dct_32F(rimg, img_dct);
+    pattern_to_dct_64F(rimg, img_dct);
     cv::normalize(img_dct, img_dct, 0, 255, cv::NORM_MINMAX);
     img_dct.convertTo(rdct8U, CV_8U);
 }
 
 
 
-void DCTFeature::pattern_to_features(const cv::Mat& rimg, std::vector<float>& rfv) const
+void DCTFeature::pattern_to_features(const cv::Mat& rimg, std::vector<double>& rfv) const
 {
     cv::Mat img_dct;
-    pattern_to_dct_32F(rimg, img_dct);
+    pattern_to_dct_64F(rimg, img_dct);
 
     // extract desired components from DCT to get feature vector
     rfv.resize(kfvsize);
     size_t mm = 0;
     for (size_t ii = kmincomp; ii <= kmaxcomp; ii++)
     {
-        rfv[mm] = img_dct.at<float>(vzigzagpts[ii]);
+        rfv[mm] = img_dct.at<double>(vzigzagpts[ii]);
         mm++;
     }
 }
 
 
 
-void DCTFeature::features_to_pattern(const std::vector<float>& rfv, cv::Mat& rimg) const
+void DCTFeature::features_to_pattern(const std::vector<double>& rfv, cv::Mat& rimg) const
 {
-    cv::Mat img_dct = cv::Mat::zeros({ kdim, kdim }, CV_32F);
+    cv::Mat img_dct = cv::Mat::zeros({ kdim, kdim }, CV_64F);
 
     // reconstruct DCT components
     size_t mm = 0;
@@ -98,7 +98,7 @@ void DCTFeature::features_to_pattern(const std::vector<float>& rfv, cv::Mat& rim
     {
         if (mm < rfv.size())
         {
-            img_dct.at<float>(vzigzagpts[ii]) = rfv[mm];
+            img_dct.at<double>(vzigzagpts[ii]) = rfv[mm];
         }
         mm++;
     }
@@ -114,7 +114,7 @@ void DCTFeature::features_to_pattern(const std::vector<float>& rfv, cv::Mat& rim
 
 void DCTFeature::generate_zigzag_pts(const int k, std::vector<cv::Point>& rvec)
 {
-    cv::Point pt = { 0,0 };
+    cv::Point pt = { 0, 0 };
     enum edir { EAST, SW, SOUTH, NE };
     enum edir zdir = EAST;
     int nn = k * k;

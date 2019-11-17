@@ -43,9 +43,9 @@ public:
 
     void clear() { _vvp.clear(); _vvn.clear(); _vv0.clear(); }
 
-    const std::vector<float>& get_p_sample(const int i) { return _vvp[i]; }
-    const std::vector<float>& get_n_sample(const int i) { return _vvn[i]; }
-    const std::vector<float>& get_0_sample(const int i) { return _vv0[i]; }
+    const std::vector<double>& get_p_sample(const int i) { return _vvp[i]; }
+    const std::vector<double>& get_n_sample(const int i) { return _vvn[i]; }
+    const std::vector<double>& get_0_sample(const int i) { return _vv0[i]; }
     
     bool load_samples_from_img(
         const std::string& rsfile,
@@ -65,19 +65,18 @@ public:
 
     static bool read_csv_into_mat(const std::string& rs, cv::Mat& rimg);
     
-    static void spew_float_vecs_to_csv(
+    static void spew_double_vecs_to_csv(
         const std::string& rs,
         const std::string& rsuffix,
-        std::vector<std::vector<float>>& rvv);
+        std::vector<std::vector<double>>& rvv);
     
 private:
 
     int kdim;
-    int krad;
 
-    std::vector<std::vector<float>> _vvp;
-    std::vector<std::vector<float>> _vvn;
-    std::vector<std::vector<float>> _vv0;
+    std::vector<std::vector<double>> _vvp;
+    std::vector<std::vector<double>> _vvn;
+    std::vector<std::vector<double>> _vv0;
 
     DCTFeature dct_fv;
 };
