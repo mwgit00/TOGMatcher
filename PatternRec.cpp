@@ -190,7 +190,7 @@ bool PatternRec::load_samples_from_img(
     krad = kdim / 2;
 
     // now that dimension is known a BGRLandmark matcher can be created
-    BGRLandmark bgrm;
+    cpoz::BGRLandmark bgrm;
     bgrm.init(kdim);
     bgrm.set_color_id_enable(false);
 
@@ -216,7 +216,7 @@ bool PatternRec::load_samples_from_img(
 
             // these should all match because they were captured with same settings
             cv::Mat img_match;
-            std::vector<BGRLandmark::landmark_info_t> lminfo;
+            std::vector<cpoz::BGRLandmark::landmark_info_t> lminfo;
             bgrm.perform_match(img(roi), img_roi, img_match, lminfo);
 
             std::vector<float> vfeature;

@@ -238,7 +238,7 @@ void loop2(void)
     Mat img_gray;
     Mat tmatch;
 
-	BGRLandmark bgrm;
+	cpoz::BGRLandmark bgrm;
 	Ptr<CLAHE> pCLAHE = createCLAHE();
 
 	// need a 0 as argument
@@ -288,7 +288,7 @@ void loop2(void)
         }
 
         // look for landmarks
-        std::vector<BGRLandmark::landmark_info_t> qinfo;
+        std::vector<cpoz::BGRLandmark::landmark_info_t> qinfo;
         bgrm.perform_match(img_viewer, img_gray, tmatch, qinfo);
         minMaxLoc(tmatch, nullptr, &qmax, nullptr, &ptmax);
 
@@ -340,7 +340,7 @@ void loop2(void)
 
                                 // sort image points by label code
                                 std::vector<cv::Vec2f> vimgpts;
-                                std::sort(qinfo.begin(), qinfo.end(), BGRLandmark::compare_by_code);
+                                std::sort(qinfo.begin(), qinfo.end(), cpoz::BGRLandmark::compare_by_code);
                                 for (const auto& r : qinfo)
                                 {
                                     vimgpts.push_back(cv::Vec2f(r.ctr.x, r.ctr.y));
