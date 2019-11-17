@@ -68,6 +68,7 @@ int n_record_ctr = 0;
 
 const std::vector<T_file_info> vfiles =
 {
+    { 0.00, 1.0, "bgrlm9.png"},
     { 0.00, 1.0, "circle_b_on_w.png"},
     { 0.00, 1.0, "bottle_20perc_top_b_on_w.png"},
     { 0.00, 1.0, "bottle_20perc_curve_b_on_w.png"},
@@ -225,8 +226,8 @@ void loop2(void)
     std::vector<std::vector<cv::Vec2f>> vvcal;
     std::vector<std::string> vcalfiles;
     std::set<int> cal_label_set;
-    int cal_good_ct;
-    int cal_ct;
+    int cal_good_ct = 0;
+    int cal_ct = 0;
     
     double qmax;
     Size capture_size;
@@ -235,7 +236,6 @@ void loop2(void)
     Mat img;
     Mat img_viewer;
     Mat img_gray;
-    Mat img_channels[3];
     Mat tmatch;
 
 	BGRLandmark bgrm;
@@ -276,19 +276,8 @@ void loop2(void)
             static_cast<int>(capture_size.height * img_scale));
         resize(img, img_viewer, viewer_size);
 
-        // apply the current channel setting
-        int nchan = theKnobs.get_channel();
-        if (nchan == Knobs::ALL_CHANNELS)
-        {
-            // combine all channels into grayscale
-            cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
-        }
-        else
-        {
-            // select only one BGR channel
-            split(img_viewer, img_channels);
-            img_gray = img_channels[nchan];
-        }
+        // combine all channels into grayscale
+        cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
 
         // apply the current histogram equalization setting
         if (theKnobs.get_equ_hist_enabled())
@@ -296,13 +285,6 @@ void loop2(void)
             double c = theKnobs.get_clip_limit();
             pCLAHE->setClipLimit(c);
             pCLAHE->apply(img_gray, img_gray);
-        }
-
-        // apply the current blur setting
-        int kblur = theKnobs.get_pre_blur();
-        if (kblur >= 3)
-        {
-            GaussianBlur(img_gray, img_gray, { kblur, kblur }, 0, 0);
         }
 
         // look for landmarks
@@ -403,7 +385,7 @@ void loop2(void)
                 const Point& tmpl_offset = bgrm.get_template_offset();
                 cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
-                match_mask = (tmatch > MATCH_DISPLAY_THRESHOLD);
+                match_mask = (tmatch > 0.9);// MATCH_DISPLAY_THRESHOLD);
                 findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
                 drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
                 max_mode = max_mode_t::RECT;
@@ -688,7 +670,7 @@ void test_patt_rec()
     // convert components back to image
     // this better look like a checker board corner
     cv::Mat img_test;
-    prfoo.samp_to_pattern(samp_dct, img_test);
+    prfoo.get_dct_fv().features_to_pattern(samp_dct, img_test);
     cv::imwrite("dbg_test_pca.png", img_test);
 }
 
@@ -697,7 +679,7 @@ void test_patt_rec()
 int main(int argc, char** argv)
 {
     // uncomment line below to test the PCA and DCT stuff and quit
-    //test_patt_rec(); return 0;
+    test_patt_rec(); return 0;
 
     // uncomment lines below to test reading back cal data
     //std::vector<std::vector<cv::Vec2f>> vvcal;

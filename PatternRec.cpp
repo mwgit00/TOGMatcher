@@ -28,10 +28,8 @@
 
 
 
-PatternRec::PatternRec()
+PatternRec::PatternRec() : dct_fv(8, 1, 20)
 {
-    // generate DCT zigzag point lookup vector
-    get_zigzag_pts(kdct, _vzzpts);
 }
 
 
@@ -161,63 +159,12 @@ void PatternRec::spew_float_vecs_to_csv(
 
 
 
-void PatternRec::get_zigzag_pts(const int k, std::vector<cv::Point>& rvec)
-{
-    cv::Point pt = { 0,0 };
-    enum edir { EAST, SW, SOUTH, NE };
-    enum edir zdir = EAST;
-    int nn = k * k;
-    int kstop = k - 1;
-    for (int i = 0; i < nn; i++)
-    {
-        rvec.push_back(pt);
-        if (zdir == EAST)
-        {
-            pt.x++;
-            zdir = (pt.y == kstop) ? NE : SW;
-        }
-        else if (zdir == SW)
-        {
-            pt.x--;
-            pt.y++;
-            if (pt.y == kstop)
-            {
-                zdir = EAST;
-            }
-            else if (pt.x == 0)
-            {
-                zdir = SOUTH;
-            }
-        }
-        else if (zdir == SOUTH)
-        {
-            pt.y++;
-            zdir = (pt.x == kstop) ? SW : NE;
-        }
-        else if (zdir == NE)
-        {
-            pt.x++;
-            pt.y--;
-            if (pt.x == kstop)
-            {
-                zdir = SOUTH;
-            }
-            else if (pt.y == 0)
-            {
-                zdir = EAST;
-            }
-        }
-    }
-}
-
-
-
 bool PatternRec::load_samples_from_img(
     const std::string& rsfile,
     const int maxsampct,
     const bool is_axes_flipped)
 {
-    const int kdctcompct = kdctmaxcomp - kdctmincomp + 1;
+    const int kdctcompct = dct_fv.fvsize();
 
     cv::Mat img_gray;
     cv::Mat img = cv::imread(rsfile, cv::IMREAD_COLOR);
@@ -272,23 +219,8 @@ bool PatternRec::load_samples_from_img(
             std::vector<BGRLandmark::landmark_info_t> lminfo;
             bgrm.perform_match(img(roi), img_roi, img_match, lminfo);
 
-            // make a square image of fixed dim
-            // convert to float in -128 to 127 range
-            // then run DCT on it (just like a JPEG block)
-            cv::Mat img_dct, img_src, img_src_32f;
-            cv::resize(img_roi, img_src, { kdct,kdct });
-            img_src.convertTo(img_src_32f, CV_32F);
-            img_src_32f -= 128.0;
-            cv::dct(img_src_32f, img_dct, 0);
-
-            // create a feature vector for this sample
-            // by extracting components from the DCT using zigzag traversal
             std::vector<float> vfeature;
-            for (int ii = kdctmincomp; ii <= kdctmaxcomp; ii++)
-            {
-                float val = img_dct.at<float>(_vzzpts[ii]);
-                vfeature.push_back(val);
-            }
+            dct_fv.pattern_to_features(img_roi, vfeature);
 
             // stick feature vector in appropriate structure
             if ((bgr_pixel != cv::Scalar{ 255, 255, 255 }) || (lminfo.size() == 0))
@@ -312,7 +244,7 @@ bool PatternRec::load_samples_from_img(
 
     // the samples have a crude ordering based on how they were collected
     // so shuffle in case we don't want to use all the samples
-    // this insures a subset has similar variation
+    // this insures a subset has similar variation (maybe)
     if (maxsampct > 0)
     {
         std::random_shuffle(vvp.begin(), vvp.end());
@@ -338,25 +270,4 @@ void PatternRec::save_samples_to_csv(const std::string& rsprefix)
     spew_float_vecs_to_csv(rsprefix, "_p", _vvp);
     spew_float_vecs_to_csv(rsprefix, "_n", _vvn);
     spew_float_vecs_to_csv(rsprefix, "_0", _vv0);
-}
-
-
-
-void PatternRec::samp_to_pattern(const std::vector<float>& rsamp, cv::Mat& rimg)
-{
-    cv::Mat img_dct = cv::Mat::zeros({ kdct, kdct }, CV_32F);
-    
-    // reconstruct DCT components
-    int mm = 0;
-    for (int ii = kdctmincomp; ii <= kdctmaxcomp; ii++)
-    {
-        img_dct.at<float>(_vzzpts[ii]) = rsamp[mm];
-        mm++;
-    }
-
-    // invert DCT and rescale for a gray image
-    cv::Mat img_idct;
-    cv::idct(img_dct, img_idct, 0);
-    cv::normalize(img_idct, img_idct, 0, 255, cv::NORM_MINMAX);
-    img_idct.convertTo(rimg, CV_8U);
 }

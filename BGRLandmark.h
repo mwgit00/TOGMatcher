@@ -24,11 +24,12 @@
 #define BGR_LANDMARK_H_
 
 // uncomment line below to collect up to 1000 samples and write them to an image file when done
-//#define _COLLECT_SAMPLES
+#define _COLLECT_SAMPLES
 
 #include <map>
 #include "opencv2/imgproc.hpp"
-#include "TOGMatcher.h"
+#include "DCTFeature.h"
+//#include "TOGMatcher.h"
 
 
 class BGRLandmark
@@ -173,6 +174,8 @@ public:
     int samp_ct;
     cv::Mat samples;
 #endif
+
+    DCTFeature dct_fv;
 };
 
 #endif // BGR_LANDMARK_H_

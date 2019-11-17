@@ -33,6 +33,9 @@
     <ClCompile Include="PatternRec.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DCTFeature.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Knobs.h">
@@ -48,6 +51,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PatternRec.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DCTFeature.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -25,6 +25,7 @@
 
 #include <string>
 #include "opencv2/imgproc.hpp"
+#include "DCTFeature.h"
 
 
 class PatternRec
@@ -38,6 +39,8 @@ public:
     PatternRec();
     virtual ~PatternRec();
 
+    DCTFeature& get_dct_fv(void) { return dct_fv; }
+
     void clear() { _vvp.clear(); _vvn.clear(); _vv0.clear(); }
 
     const std::vector<float>& get_p_sample(const int i) { return _vvp[i]; }
@@ -50,8 +53,6 @@ public:
         const bool is_axes_flipped = false);
 
     void save_samples_to_csv(const std::string& rsprefix);
-
-    void samp_to_pattern(const std::vector<float>& rsamp, cv::Mat& rimg);
 
 public:
 
@@ -69,26 +70,16 @@ public:
         const std::string& rsuffix,
         std::vector<std::vector<float>>& rvv);
     
-    // generates a vector of points that traverses
-    // a "zig-zag" path through a square matrix
-    // this mimics how a JPEG block is encoded
-    static void get_zigzag_pts(const int k, std::vector<cv::Point>& rvec);
-
 private:
 
     int kdim;
     int krad;
 
-    // DCT is run on 8x8 image and components 1-20 are used
-    const int kdct = 8;
-    const int kdctmincomp = 1;
-    const int kdctmaxcomp = 20;
-
     std::vector<std::vector<float>> _vvp;
     std::vector<std::vector<float>> _vvn;
     std::vector<std::vector<float>> _vv0;
 
-    std::vector<cv::Point> _vzzpts;
+    DCTFeature dct_fv;
 };
 
 #endif // PATTERN_REC_H_

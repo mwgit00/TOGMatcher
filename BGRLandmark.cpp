@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include <list>
+#include <iostream>
 #include "opencv2/highgui.hpp"
 #include "BGRLandmark.h"
 
@@ -69,7 +70,8 @@ static T apply_rail(const T v, const T vmin, const T vmax)
 
 
 
-BGRLandmark::BGRLandmark()
+BGRLandmark::BGRLandmark() :
+    dct_fv(4, 1, 9)
 {
     init();
 #ifdef _DEBUG
@@ -202,10 +204,16 @@ void BGRLandmark::perform_match(
             landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi, -1 };
 
             cv::Mat img_roi_bgr(rsrc_bgr(roi));
+            cv::Mat img_roi_gray(rsrc(roi));
 
 #ifdef _COLLECT_SAMPLES
             if (samp_ct < 1000)
             {
+                cv::Mat frel;
+                cv::Mat grel;
+                dct_fv.pattern_to_dct_8U(img_roi_gray, frel);
+                cv::cvtColor(frel, grel, cv::COLOR_GRAY2BGR);
+
                 int k = tmpl_gray_p.size().width + 4;
                 int x = (samp_ct % sampx) * k;
                 int y = (samp_ct / sampx) * k;
@@ -214,7 +222,15 @@ void BGRLandmark::perform_match(
                 // surround each sample with a white border that can be manually re-colored
                 cv::rectangle(samples, roi1, { 255,255,255 });
                 cv::Rect roi2 = { {x + 2, y + 2}, cv::Size(k - 4, k - 4) };
+                //cv::Mat img_roi_bgr_proc;
+                //cv::bilateralFilter(img_roi_bgr, img_roi_bgr_proc, 3, 200, 200);
+
                 img_roi_bgr.copyTo(samples(roi2));
+                samp_ct++;
+                x = (samp_ct % sampx) * k;
+                y = (samp_ct / sampx) * k;
+                cv::Rect roi3 = { {x + 2, y + 2}, cv::Size(dct_fv.dim(), dct_fv.dim()) };
+                grel.copyTo(samples(roi3));
                 samp_ct++;
             }
 #endif
@@ -224,7 +240,7 @@ void BGRLandmark::perform_match(
             if (is_color_id_enabled)
             {
                 // use bilateral filter to suppress as much noise as possible in ROI
-                // while also preserving sharp edges
+                // while also preserving edges between colored regions
                 cv::Mat img_roi_bgr_proc;
                 cv::bilateralFilter(img_roi_bgr, img_roi_bgr_proc, 3, 200, 200);
                 identify_colors(img_roi_bgr_proc, lminfo);

@@ -117,6 +117,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="BGRLandmark.cpp" />
+    <ClCompile Include="DCTFeature.cpp" />
     <ClCompile Include="Knobs.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="PatternRec.cpp" />
@@ -125,6 +126,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BGRLandmark.h" />
+    <ClInclude Include="DCTFeature.h" />
     <ClInclude Include="Knobs.h" />
     <ClInclude Include="PatternRec.h" />
     <ClInclude Include="TOGMatcher.h" />
