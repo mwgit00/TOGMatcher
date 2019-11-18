@@ -162,7 +162,7 @@ void PatternRec::spew_double_vecs_to_csv(
 bool PatternRec::load_samples_from_img(
     const std::string& rsfile,
     const int maxsampct,
-    const bool is_axes_flipped)
+    const bool is_horiz_flipped)
 {
     const int kdctcompct = dct_fv.fvsize();
 
@@ -174,9 +174,9 @@ bool PatternRec::load_samples_from_img(
         return false;
     }
 
-    if (is_axes_flipped)
+    if (is_horiz_flipped)
     {
-        cv::flip(img, img, -1);
+        cv::flip(img, img, 0);
     }
 
     cv::cvtColor(img, img_gray, cv::COLOR_BGR2GRAY);

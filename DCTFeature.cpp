@@ -48,12 +48,12 @@ DCTFeature::~DCTFeature()
 
 void DCTFeature::pattern_to_dct_64F(const cv::Mat& rimg, cv::Mat& rdct64F) const
 {
-    // make a square image
+    // shrink input to square image of size for DCT
     // convert to double in -128 to 127 range
     // then run DCT on it (just like a JPEG block)
     cv::Mat img_src;
     cv::Mat img_src_64F;
-    cv::resize(rimg, img_src, { kdim, kdim });
+    cv::resize(rimg, img_src, cv::Size(kdim, kdim), 0, 0, cv::INTER_AREA);
     img_src.convertTo(img_src_64F, CV_64F);
     img_src_64F -= 128.0;
     cv::dct(img_src_64F, rdct64F, 0);

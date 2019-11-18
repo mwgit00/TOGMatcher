@@ -72,7 +72,7 @@ namespace cpoz
 
 
     BGRLandmark::BGRLandmark() :
-        dct_fv(4, 1, 9)
+        dct_fv(8, 6, 14)
     {
         init();
 #ifdef _DEBUG
