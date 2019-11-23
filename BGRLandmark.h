@@ -88,6 +88,8 @@ namespace cpoz
             const int thr_pix_min = 70,     // grey image dark pixel threshold for pre-proc
             const int thr_bgr_rng = 20);    // range in BGR required for color matching step
 
+        bool init_shape_test(const std::string& rs);
+
         // runs the match on an original BGR image and possibly pre-processed gray image
         // it returns a gray image with the raw template match and a vector of landmark info
         void perform_match(
@@ -179,6 +181,8 @@ namespace cpoz
 #endif
 
         DCTFeature dct_fv;
+        double thr_p;
+        double thr_n;
     };
 }
 

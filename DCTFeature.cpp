@@ -25,16 +25,9 @@
 
 
 
-DCTFeature::DCTFeature(const int k, const int imin, const int imax) :
-    kdim(k),
-    kmincomp(imin),
-    kmaxcomp(imax)
+DCTFeature::DCTFeature(const int k, const int imin, const int imax)
 {
-    // generate DCT zigzag point lookup vector (same as what JPEG does)
-    generate_zigzag_pts(kdim, vzigzagpts);
-
-    // stash size of feature vector
-    kfvsize = (kmaxcomp - kmincomp) + 1;
+    init(k, imin, imax);
 }
 
 
@@ -42,6 +35,85 @@ DCTFeature::DCTFeature(const int k, const int imin, const int imax) :
 DCTFeature::~DCTFeature()
 {
     // does nothing
+}
+
+
+
+void DCTFeature::init(const int k, const int imin, const int imax)
+{
+    kdim = k;
+    kmincomp = imin;
+    kmaxcomp = imax;
+    
+    // generate DCT zigzag point lookup vector (same as what JPEG does)
+    generate_zigzag_pts(kdim, vzigzagpts);
+
+    // stash size of feature vector
+    kfvsize = (kmaxcomp - kmincomp) + 1;
+
+    // consider the current mean and inv. covariance matrices to be invalid
+    is_stats_loaded = false;
+}
+
+
+bool DCTFeature::load(const std::string& rs)
+{
+    is_stats_loaded = false;
+    try
+    {
+        int k, imin, imax;
+        cv::FileStorage cvfs;
+        
+        cvfs.open(rs, cv::FileStorage::READ);
+        cvfs["dct_kdim"] >> k;
+        cvfs["dct_kmincomp"] >> imin;
+        cvfs["dct_kmaxcomp"] >> imax;
+
+        vstats.clear();
+        cv::FileNode nodem = cvfs["stats"];
+        for (cv::FileNodeIterator it = nodem.begin(); it != nodem.end(); it++)
+        {
+            cv::FileNode item = *it;
+            vstats.emplace_back(T_DCT_STATS());
+            T_DCT_STATS& rx = vstats.back();
+            item["name"] >> rx.name;
+            item["mean"] >> rx.mean;
+            item["invcov"] >> rx.invcov;
+            item["thr"] >> rx.thr;
+            rx.is_loaded = true;
+        }
+
+        init(k, imin, imax);
+        is_stats_loaded = true;
+    }
+    catch (std::exception& ex)
+    {
+        vstats.clear();
+    }
+    return is_stats_loaded;
+}
+
+
+
+double DCTFeature::dist(const size_t idx, const std::vector<double>& rfv) const
+{
+    double r = DBL_MAX;
+    if (idx < vstats.size())
+    {
+        r = cv::Mahalanobis(rfv, vstats[idx].mean, vstats[idx].invcov);
+    }
+    return r;
+}
+
+bool DCTFeature::is_match(const size_t idx, const std::vector<double>& rfv) const
+{
+    bool result = false;
+    if (idx < vstats.size())
+    {
+        double r = cv::Mahalanobis(rfv, vstats[idx].mean, vstats[idx].invcov);
+        result = (r < vstats[idx].thr);
+    }
+    return result;
 }
 
 
@@ -119,6 +191,8 @@ void DCTFeature::generate_zigzag_pts(const int k, std::vector<cv::Point>& rvec)
     enum edir zdir = EAST;
     int nn = k * k;
     int kstop = k - 1;
+
+    rvec.clear();
     for (int i = 0; i < nn; i++)
     {
         rvec.push_back(pt);

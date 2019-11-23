@@ -701,6 +701,32 @@ void test_patt_rec()
         cv::invert(covar_n, covar_inv_n, DECOMP_SVD);
 
         std::cout << prfoo.get_dct_fv().get_zigzag_pts() << std::endl;
+
+        // create stats file for BGRLandmark matcher
+        std::vector<DCTFeature::T_DCT_STATS> vstat;
+        vstat.push_back({ mean_p, covar_inv_p, 0.075, "p", true });
+        vstat.push_back({ mean_n, covar_inv_n, 0.075, "n", true });
+        cv::FileStorage cvfs;
+        cvfs.open("bgrm_patt_20.yaml", cv::FileStorage::WRITE);
+        cvfs << "dct_kdim" << prfoo.get_dct_fv().dim();
+        cvfs << "dct_kmincomp" << prfoo.get_dct_fv().imin();
+        cvfs << "dct_kmaxcomp" << prfoo.get_dct_fv().imax();
+        cvfs << "stats" << "[";
+        for (auto& r : vstat)
+        {
+            cvfs << "{";
+            cvfs << "name" << r.name;
+            cvfs << "mean" << r.mean;
+            cvfs << "invcov" << r.invcov;
+            cvfs << "thr" << r.thr;
+            cvfs << "}";
+        }
+        cvfs << "]";
+        cvfs.release();
+
+        DCTFeature dct_foo;
+        if (dct_foo.load("bgrm_patt_20.yaml")) std::cout << "loaded new DCT thingy" << std::endl;
+
         for (size_t ii = 0; ii < 20; ii++)
         {
             std::cout << cv::Mahalanobis(prfoo.get_0_sample(ii), mean_p, covar_inv_p) << ", ";
@@ -711,6 +737,16 @@ void test_patt_rec()
 
             std::cout << cv::Mahalanobis(prfoo.get_n_sample(ii), mean_p, covar_inv_p) << ", ";
             std::cout << cv::Mahalanobis(prfoo.get_n_sample(ii), mean_n, covar_inv_n) << std::endl;
+
+            std::cout << dct_foo.dist(0, prfoo.get_0_sample(ii)) << ", ";
+            std::cout << dct_foo.dist(1, prfoo.get_0_sample(ii)) << ",  ";
+
+            std::cout << dct_foo.dist(0, prfoo.get_p_sample(ii)) << ", ";
+            std::cout << dct_foo.dist(1, prfoo.get_p_sample(ii)) << ",  ";
+
+            std::cout << dct_foo.dist(0, prfoo.get_n_sample(ii)) << ", ";
+            std::cout << dct_foo.dist(1, prfoo.get_n_sample(ii)) << std::endl;
+            std::cout << "--\n";
 
             if (ii == 0)
             {

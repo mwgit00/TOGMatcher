@@ -28,7 +28,7 @@
 
 
 
-PatternRec::PatternRec() : dct_fv(8, 1, 14)
+PatternRec::PatternRec() : dct_fv(8, 1, 20)
 {
 }
 

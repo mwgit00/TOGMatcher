@@ -72,7 +72,9 @@ namespace cpoz
 
 
     BGRLandmark::BGRLandmark() :
-        dct_fv(8, 6, 14)
+        dct_fv(8, 6, 14),
+        thr_p(0.0),
+        thr_n(0.0)
     {
         init();
 #ifdef _DEBUG
@@ -144,6 +146,13 @@ namespace cpoz
         samp_ct = 0;
         samples = cv::Mat::zeros({ (kdim + 4) * sampx, (kdim + 4) * sampy }, CV_8UC3);
 #endif
+    }
+
+
+
+    bool BGRLandmark::init_shape_test(const std::string& rs)
+    {
+        return dct_fv.load(rs);
     }
 
 
@@ -236,8 +245,19 @@ namespace cpoz
                 }
 #endif
 
-                // TODO -- maybe add some kind of additional shape test
+                // optional shape test using DCT feature vectors
+                bool is_shape_test_ok = true;
+                if (dct_fv.is_loaded())
+                {
+                    std::vector<double> fvp;
+                    std::vector<double> fvn;
+                    dct_fv.pattern_to_features(img_roi, fvp);
+                    dct_fv.pattern_to_features(img_roi, fvn);
+                    is_shape_test_ok = dct_fv.is_match(0, fvp) && dct_fv.is_match(1, fvn);
+                }
 
+                // optional color test
+                bool is_color_test_ok = true;
                 if (is_color_id_enabled)
                 {
                     // use bilateral filter to suppress as much noise as possible in ROI
@@ -245,15 +265,12 @@ namespace cpoz
                     cv::Mat img_roi_bgr_proc;
                     cv::bilateralFilter(img_roi_bgr, img_roi_bgr_proc, 3, 200, 200);
                     identify_colors(img_roi_bgr_proc, lminfo);
-
-                    // save it if color test gave a sane result
-                    if (lminfo.code != -1)
-                    {
-                        rinfo.push_back(lminfo);
-                    }
+                    is_color_test_ok = (lminfo.code != -1);
                 }
-                else
+
+                if (is_shape_test_ok && is_color_test_ok)
                 {
+                    // passed simple thresholding, shape test, color test
                     rinfo.push_back(lminfo);
                 }
             }
