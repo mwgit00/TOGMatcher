@@ -23,8 +23,11 @@
 #ifndef BGR_LANDMARK_H_
 #define BGR_LANDMARK_H_
 
-// uncomment line below to collect up to 1000 samples and write them to an image file when done
-#define _COLLECT_SAMPLES
+// uncomment line below to dump landmark test images (DBG only)
+//#define _DUMP_TEST_IMAGES
+
+// uncomment line below to collect up to 1000 samples and write them to image file (DBG/REL)
+//#define _COLLECT_SAMPLES
 
 #include <map>
 #include "opencv2/imgproc.hpp"
@@ -182,8 +185,6 @@ namespace cpoz
 #endif
 
         DCTFeature dct_fv;
-        double thr_p;
-        double thr_n;
     };
 }
 

@@ -71,13 +71,10 @@ namespace cpoz
 
 
 
-    BGRLandmark::BGRLandmark() :
-        dct_fv(8, 6, 14),
-        thr_p(0.0),
-        thr_n(0.0)
+    BGRLandmark::BGRLandmark()
     {
         init();
-#ifdef _DEBUG
+#if defined(_DEBUG) && defined(_DUMP_TEST_IMAGES)
         for (int i = 0; i < 12; i++)
         {
             cv::Mat img1;
@@ -130,7 +127,7 @@ namespace cpoz
         cv::cvtColor(tmpl_bgr, tmpl_gray_p, cv::COLOR_BGR2GRAY);
         cv::rotate(tmpl_gray_p, tmpl_gray_n, cv::ROTATE_90_CLOCKWISE);
 
-#ifdef _DEBUG
+#if defined(_DEBUG) && defined(_DUMP_TEST_IMAGES)
         imwrite("dbg_tmpl_gray_p.png", tmpl_gray_p);
         imwrite("dbg_tmpl_gray_n.png", tmpl_gray_n);
 #endif
@@ -237,11 +234,13 @@ namespace cpoz
 
                     img_roi_bgr.copyTo(samples(roi2));
                     samp_ct++;
+#if 0
                     x = (samp_ct % sampx) * k;
                     y = (samp_ct / sampx) * k;
                     cv::Rect roi3 = { {x + 2, y + 2}, cv::Size(dct_fv.dim(), dct_fv.dim()) };
                     grel.copyTo(samples(roi3));
                     samp_ct++;
+#endif
                 }
 #endif
                 // optional color test
@@ -256,15 +255,31 @@ namespace cpoz
                     is_color_test_ok = (lminfo.code != -1);
                 }
 
-                // optional shape test using DCT feature vectors
+                // optional shape test
                 // this is only done if every other test has passed
                 bool is_shape_test_ok = true;
                 if (is_color_test_ok && dct_fv.is_loaded())
                 {
+#if 0
                     std::vector<double> v;
                     dct_fv.pattern_to_features(img_roi, v);
                     size_t idx = (lminfo.diff > 0.0) ? 0 : 1;
                     is_shape_test_ok = dct_fv.is_match(idx, v, &lminfo.rmatch);
+#else
+                    cv::Mat tmatchx;
+                    cv::Mat img_roi_gray_equ;
+                    cv::equalizeHist(img_roi_gray, img_roi_gray_equ);
+                    if (lminfo.diff > 0)
+                    {
+                        matchTemplate(img_roi_gray_equ, tmpl_gray_p, tmatchx, cv::TM_SQDIFF_NORMED);
+                    }
+                    else
+                    {
+                        matchTemplate(img_roi_gray_equ, tmpl_gray_n, tmatchx, cv::TM_SQDIFF_NORMED);
+                    }
+                    lminfo.rmatch = tmatchx.at<float>(0, 0);
+                    is_shape_test_ok = (lminfo.rmatch < 0.2);
+#endif
                 }
 
                 if (is_shape_test_ok && is_color_test_ok)
@@ -427,7 +442,7 @@ namespace cpoz
         cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
         cv::line(rimg, { kh, kh }, { kh, kh }, avg_all);
 
-#ifdef _DEBUG
+#if defined(_DEBUG) && defined(_DUMP_TEST_IMAGES)
         cv::imwrite("dbg_tmpl_bgr.png", rimg);
 #endif
     }

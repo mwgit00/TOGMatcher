@@ -645,48 +645,61 @@ void test_patt_rec()
 {
     // some experimental stuff with PCA...
     PatternRec prfoo;
-    
-    prfoo.load_samples_from_img("samples_1K_9x9_markup.png");
-    prfoo.load_samples_from_img("samples_1K_9x9_markup2.png");
-    //prfoo.load_samples_from_img("samples_1K_11x11_markup.png");
-    //prfoo.load_samples_from_img("samples_1K_11x11_markup2.png");
-    //prfoo.load_samples_from_img("samples_1K_13x13_markup.png");
-    //prfoo.load_samples_from_img("samples_1K_15x15_markup.png");
-    
-    // a horizontal flip converts negative samples into positive samples
-    prfoo.load_samples_from_img("samples_1K_9x9_markup.png", -1, true);
-    prfoo.load_samples_from_img("samples_1K_9x9_markup2.png", -1, true);
-    //prfoo.load_samples_from_img("samples_1K_11x11_markup.png", -1, true);
-    //prfoo.load_samples_from_img("samples_1K_11x11_markup2.png", -1, true);
-    //prfoo.load_samples_from_img("samples_1K_13x13_markup.png", -1, true);
-    //prfoo.load_samples_from_img("samples_1K_15x15_markup.png", -1, true);
+
+    prfoo.load_samples_from_img("samples_1K_9keep2.png");
+
+    //prfoo.load_samples_from_img("samples_1K_9x9_markup.png");
+    //prfoo.load_samples_from_img("samples_1K_9x9_markup2.png");
+    ////prfoo.load_samples_from_img("samples_1K_11x11_markup.png");
+    ////prfoo.load_samples_from_img("samples_1K_11x11_markup2.png");
+    ////prfoo.load_samples_from_img("samples_1K_13x13_markup.png");
+    ////prfoo.load_samples_from_img("samples_1K_15x15_markup.png");
+    //
+    //// a horizontal flip converts negative samples into positive samples
+    //prfoo.load_samples_from_img("samples_1K_9x9_markup.png", -1, true);
+    //prfoo.load_samples_from_img("samples_1K_9x9_markup2.png", -1, true);
+    ////prfoo.load_samples_from_img("samples_1K_11x11_markup.png", -1, true);
+    ////prfoo.load_samples_from_img("samples_1K_11x11_markup2.png", -1, true);
+    ////prfoo.load_samples_from_img("samples_1K_13x13_markup.png", -1, true);
+    ////prfoo.load_samples_from_img("samples_1K_15x15_markup.png", -1, true);
     
     // dump all the samples...
     prfoo.save_samples_to_csv("train_all");
     
-    if (true)
+    if (false)
     {
-        // for 8x8 DCT, components 1-20
-        // run PCA with 0.96 variance threshold
-        // testing shows this reduces the components down to 9
-        // (which is symmetrical in the upper left corner of the 8x8 DCT image ???)
-        PatternRec::run_csv_to_pca("train_all_p.csv", "train_all_pca.yaml", 0.96);
+        PatternRec::run_csv_to_pca("train_all_p.csv", "train_all_pca.yaml", 0.8);
 
         cv::PCA mypca;
         PatternRec::load_pca("train_all_pca.yaml", mypca);
 
         // test PCA project and back-project to get back DCT components
-        cv::Mat samp_pca = mypca.project(prfoo.get_p_sample(988));
+        cv::Mat samp_pca = mypca.project(prfoo.get_p_sample(88/*988*/));
         cv::Mat samp_dct = mypca.backProject(samp_pca);
+        cv::Mat samp_mean = mypca.mean;
 
         // convert components back to image
         // this better look like a checker board corner
         cv::Mat img_test;
         prfoo.get_dct_fv().features_to_pattern(samp_dct, img_test);
         cv::imwrite("dbg_test_pca.png", img_test);
+
+#if 1
+        for (size_t ii = 0; ii < 20; ii++)
+        {
+            cv::Mat samp_p = mypca.project(prfoo.get_p_sample(ii));
+            cv::Mat samp_n = mypca.project(prfoo.get_n_sample(ii));
+            cv::Mat samp_0 = mypca.project(prfoo.get_0_sample(ii));
+            double qp = cv::norm(samp_p, mypca.project(samp_mean));
+            double qn = cv::norm(samp_n, mypca.project(samp_mean));
+            double q0 = cv::norm(samp_0, mypca.project(samp_mean));
+            std::cout << qp << ", " << qn << ", " << q0 << std::endl;
+            std::cout << "--\n";
+        }
+#endif
     }
 
-    if (true)
+    if (false)
     {
         cv::Mat img_p;
         cv::Mat mean_p;
@@ -767,9 +780,34 @@ void test_patt_rec()
                 imwrite("db_ximg_0.png", ximg);
             }
         }
-
-        std::cout << "done" << std::endl;
     }
+
+#if 1
+    if (true)
+    {
+#if 0
+        DCTFeature dct_foo;
+        if (dct_foo.load("bgrm_patt_20.yaml")) std::cout << "loaded new DCT thingy" << std::endl;
+        for (const auto& r : prfoo._vvp)
+        {
+            std::cout << dct_foo.dist(0, r) << ", " << dct_foo.dist(1, r) << std::endl;
+        }
+#endif
+        cv::Mat img = cv::imread("samples_1K_9keep2.png");
+        cv::Mat img_gray;
+        cv::Mat tmatch;
+        cvtColor(img, img_gray, COLOR_BGR2GRAY);
+        cpoz::BGRLandmark bgrm;
+        bgrm.init_shape_test("bgrm_patt_20.yaml");
+        std::vector<cpoz::BGRLandmark::landmark_info_t> qinfo;
+        bgrm.perform_match(img, img_gray, tmatch, qinfo);
+        for (const auto& r : qinfo)
+            std::cout << r.rmatch << std::endl;
+        qinfo.clear();
+    }
+#endif
+
+    std::cout << "done" << std::endl;
 }
 
 
