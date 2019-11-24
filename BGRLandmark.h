@@ -44,6 +44,7 @@ namespace cpoz
             double rng;         // range of pixels in candidate ROI
             double min;         // min pixel in candidate ROI
             int code;           // color code, -1 for unknown, else 0-11
+            double rmatch;      // shape match metric
         } landmark_info_t;
 
         // names of colors with 0 or 255 as the BGR components

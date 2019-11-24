@@ -31,14 +31,14 @@ class DCTFeature
 {
 public:
 
-    typedef struct _T_DCT_STATS_struct
+    typedef struct _T_STATS_struct
     {
         cv::Mat mean;       // mean vector for data
         cv::Mat invcov;     // inverse covariance matrix for data
         double thr;         // threshold for Mahalanobis distance match
         std::string name;   // name for this feature
         bool is_loaded;     // true if this record has valid data
-    } T_DCT_STATS;
+    } T_STATS;
 
     // default DCT is run on 8x8 image and components 1-20 are used
     // (components 1-20 correspond to first 5 "zig-zags")
@@ -56,7 +56,11 @@ public:
     size_t fvsize(void) const { return kfvsize; }
 
     double dist(const size_t idx, const std::vector<double>& rfv) const;
-    bool is_match(const size_t idx, const std::vector<double>& rfv) const;
+    
+    bool is_match(
+        const size_t idx,
+        const std::vector<double>& rfv,
+        double * pdist = nullptr) const;
 
     // convert 2D pattern to DCT (64-bit floating point)
     void pattern_to_dct_64F(const cv::Mat& rimg, cv::Mat& rdct64F) const;
@@ -88,7 +92,7 @@ private:
 
     std::vector<cv::Point> vzigzagpts;
 
-    std::vector<T_DCT_STATS> vstats;
+    std::vector<T_STATS> vstats;
     bool is_stats_loaded;
 };
 

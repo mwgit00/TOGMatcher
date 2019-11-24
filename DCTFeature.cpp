@@ -74,8 +74,8 @@ bool DCTFeature::load(const std::string& rs)
         for (cv::FileNodeIterator it = nodem.begin(); it != nodem.end(); it++)
         {
             cv::FileNode item = *it;
-            vstats.emplace_back(T_DCT_STATS());
-            T_DCT_STATS& rx = vstats.back();
+            vstats.emplace_back(T_STATS());
+            T_STATS& rx = vstats.back();
             item["name"] >> rx.name;
             item["mean"] >> rx.mean;
             item["invcov"] >> rx.invcov;
@@ -105,12 +105,16 @@ double DCTFeature::dist(const size_t idx, const std::vector<double>& rfv) const
     return r;
 }
 
-bool DCTFeature::is_match(const size_t idx, const std::vector<double>& rfv) const
+bool DCTFeature::is_match(
+    const size_t idx,
+    const std::vector<double>& rfv,
+    double* pdist) const
 {
     bool result = false;
     if (idx < vstats.size())
     {
         double r = cv::Mahalanobis(rfv, vstats[idx].mean, vstats[idx].invcov);
+        if (pdist != nullptr) *pdist = r;
         result = (r < vstats[idx].thr);
     }
     return result;

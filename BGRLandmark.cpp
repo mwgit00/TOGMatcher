@@ -244,18 +244,6 @@ namespace cpoz
                     samp_ct++;
                 }
 #endif
-
-                // optional shape test using DCT feature vectors
-                bool is_shape_test_ok = true;
-                if (dct_fv.is_loaded())
-                {
-                    std::vector<double> fvp;
-                    std::vector<double> fvn;
-                    dct_fv.pattern_to_features(img_roi, fvp);
-                    dct_fv.pattern_to_features(img_roi, fvn);
-                    is_shape_test_ok = dct_fv.is_match(0, fvp) && dct_fv.is_match(1, fvn);
-                }
-
                 // optional color test
                 bool is_color_test_ok = true;
                 if (is_color_id_enabled)
@@ -268,9 +256,20 @@ namespace cpoz
                     is_color_test_ok = (lminfo.code != -1);
                 }
 
+                // optional shape test using DCT feature vectors
+                // this is only done if every other test has passed
+                bool is_shape_test_ok = true;
+                if (is_color_test_ok && dct_fv.is_loaded())
+                {
+                    std::vector<double> v;
+                    dct_fv.pattern_to_features(img_roi, v);
+                    size_t idx = (lminfo.diff > 0.0) ? 0 : 1;
+                    is_shape_test_ok = dct_fv.is_match(idx, v, &lminfo.rmatch);
+                }
+
                 if (is_shape_test_ok && is_color_test_ok)
                 {
-                    // passed simple thresholding, shape test, color test
+                    // this is a landmark
                     rinfo.push_back(lminfo);
                 }
             }

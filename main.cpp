@@ -241,6 +241,14 @@ void loop2(void)
 	cpoz::BGRLandmark bgrm;
 	Ptr<CLAHE> pCLAHE = createCLAHE();
 
+    if (!bgrm.init_shape_test("bgrm_patt_9.yaml"))
+    {
+        std::cout << "Failed to open shape test data!" << std::endl;
+        ///////
+        return;
+        ///////
+    }
+
 	// need a 0 as argument
 	VideoCapture vcap(0);
 	if (!vcap.isOpened())
@@ -703,11 +711,11 @@ void test_patt_rec()
         std::cout << prfoo.get_dct_fv().get_zigzag_pts() << std::endl;
 
         // create stats file for BGRLandmark matcher
-        std::vector<DCTFeature::T_DCT_STATS> vstat;
+        std::vector<DCTFeature::T_STATS> vstat;
         vstat.push_back({ mean_p, covar_inv_p, 0.075, "p", true });
         vstat.push_back({ mean_n, covar_inv_n, 0.075, "n", true });
         cv::FileStorage cvfs;
-        cvfs.open("bgrm_patt_20.yaml", cv::FileStorage::WRITE);
+        cvfs.open("bgrm_patt_9.yaml", cv::FileStorage::WRITE);
         cvfs << "dct_kdim" << prfoo.get_dct_fv().dim();
         cvfs << "dct_kmincomp" << prfoo.get_dct_fv().imin();
         cvfs << "dct_kmaxcomp" << prfoo.get_dct_fv().imax();
@@ -725,7 +733,7 @@ void test_patt_rec()
         cvfs.release();
 
         DCTFeature dct_foo;
-        if (dct_foo.load("bgrm_patt_20.yaml")) std::cout << "loaded new DCT thingy" << std::endl;
+        if (dct_foo.load("bgrm_patt_9.yaml")) std::cout << "loaded new DCT thingy" << std::endl;
 
         for (size_t ii = 0; ii < 20; ii++)
         {
@@ -768,8 +776,9 @@ void test_patt_rec()
 
 int main(int argc, char** argv)
 {
-    // uncomment line below to test the PCA and DCT stuff and quit
-    //test_patt_rec(); return 0;
+    // uncomment lines below to test the PCA and DCT stuff and quit
+    //test_patt_rec();
+    //return 0;
 
     // uncomment lines below to test reading back cal data
     //std::vector<std::vector<cv::Vec2f>> vvcal;
@@ -780,7 +789,7 @@ int main(int argc, char** argv)
     //cvfs["points"] >> vvcal;
 
 // change 0 to 1 to switch test loops
-#if 0
+#if 1
     // test BGRLandmark
     loop2();
 #else
