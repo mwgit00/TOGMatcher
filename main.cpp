@@ -241,14 +241,6 @@ void loop2(void)
 	cpoz::BGRLandmark bgrm;
 	Ptr<CLAHE> pCLAHE = createCLAHE();
 
-    if (!bgrm.init_shape_test("bgrm_patt_9.yaml"))
-    {
-        std::cout << "Failed to open shape test data!" << std::endl;
-        ///////
-        return;
-        ///////
-    }
-
 	// need a 0 as argument
 	VideoCapture vcap(0);
 	if (!vcap.isOpened())
@@ -782,29 +774,20 @@ void test_patt_rec()
         }
     }
 
-#if 1
-    if (true)
+#if defined(_DEBUG) && defined(_DUMP_TEST_IMAGES)
+    for (int i = 0; i < 12; i++)
     {
-#if 0
-        DCTFeature dct_foo;
-        if (dct_foo.load("bgrm_patt_20.yaml")) std::cout << "loaded new DCT thingy" << std::endl;
-        for (const auto& r : prfoo._vvp)
-        {
-            std::cout << dct_foo.dist(0, r) << ", " << dct_foo.dist(1, r) << std::endl;
-        }
-#endif
-        cv::Mat img = cv::imread("samples_1K_9keep2.png");
-        cv::Mat img_gray;
-        cv::Mat tmatch;
-        cvtColor(img, img_gray, COLOR_BGR2GRAY);
-        cpoz::BGRLandmark bgrm;
-        bgrm.init_shape_test("bgrm_patt_20.yaml");
-        std::vector<cpoz::BGRLandmark::landmark_info_t> qinfo;
-        bgrm.perform_match(img, img_gray, tmatch, qinfo);
-        for (const auto& r : qinfo)
-            std::cout << r.rmatch << std::endl;
-        qinfo.clear();
+        cv::Mat img1;
+        char c = i + 'A';
+        std::string s = "dbg_bgrlm_" + std::string(1, c) + ".png";
+        create_landmark_image(img1, 3.0, 0.25, PATTERN_MAP.find(c)->second, { 255,255,255 });
+        cv::imwrite(s, img1);
     }
+    cv::Mat img2;
+    create_multi_landmark_image(img2, "ADGJBEHKCFIL", 4, 3, 0.5, 2.25, 0.25, { 192,192,192 });
+    cv::imwrite("dbg_multi.png", img2);
+    create_multi_landmark_image(img2, "AG", 2, 1, 0.5, 8, 0.0);
+    cv::imwrite("dbg_double.png", img2);
 #endif
 
     std::cout << "done" << std::endl;

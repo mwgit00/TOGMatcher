@@ -23,15 +23,12 @@
 #ifndef BGR_LANDMARK_H_
 #define BGR_LANDMARK_H_
 
-// uncomment line below to dump landmark test images (DBG only)
-//#define _DUMP_TEST_IMAGES
 
 // uncomment line below to collect up to 1000 samples and write them to image file (DBG/REL)
 //#define _COLLECT_SAMPLES
 
 #include <map>
 #include "opencv2/imgproc.hpp"
-#include "DCTFeature.h"
 
 
 namespace cpoz
@@ -47,7 +44,7 @@ namespace cpoz
             double rng;         // range of pixels in candidate ROI
             double min;         // min pixel in candidate ROI
             int code;           // color code, -1 for unknown, else 0-11
-            double rmatch;      // shape match metric
+            double rmatch;      // sqdiff match metric
         } landmark_info_t;
 
         // names of colors with 0 or 255 as the BGR components
@@ -90,9 +87,8 @@ namespace cpoz
             const double thr_corr = 1.6,    // threshold for dual match (range is 0.0 to 2.0)
             const int thr_pix_rng = 40,     // grey image pixel range threshold for pre-proc
             const int thr_pix_min = 70,     // grey image dark pixel threshold for pre-proc
-            const int thr_bgr_rng = 20);    // range in BGR required for color matching step
-
-        bool init_shape_test(const std::string& rs);
+            const int thr_bgr_rng = 20,     // range in BGR required for color matching step
+            const double thr_sqdiff = 0.2);
 
         // runs the match on an original BGR image and possibly pre-processed gray image
         // it returns a gray image with the raw template match and a vector of landmark info
@@ -165,6 +161,7 @@ namespace cpoz
         int thr_pix_rng;
         int thr_pix_min;
         int thr_bgr_rng;
+        double thr_sqdiff;
 
         // templates for 2x2 checkerboard grid
         cv::Mat tmpl_gray_p;
@@ -183,8 +180,6 @@ namespace cpoz
         int samp_ct;
         cv::Mat samples;
 #endif
-
-        DCTFeature dct_fv;
     };
 }
 

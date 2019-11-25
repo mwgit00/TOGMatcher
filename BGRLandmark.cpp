@@ -74,21 +74,6 @@ namespace cpoz
     BGRLandmark::BGRLandmark()
     {
         init();
-#if defined(_DEBUG) && defined(_DUMP_TEST_IMAGES)
-        for (int i = 0; i < 12; i++)
-        {
-            cv::Mat img1;
-            char c = i + 'A';
-            std::string s = "dbg_bgrlm_" + std::string(1, c) + ".png";
-            create_landmark_image(img1, 3.0, 0.25, PATTERN_MAP.find(c)->second, { 255,255,255 });
-            cv::imwrite(s, img1);
-        }
-        cv::Mat img2;
-        create_multi_landmark_image(img2, "ADGJBEHKCFIL", 4, 3, 0.5, 2.25, 0.25, { 192,192,192 });
-        cv::imwrite("dbg_multi.png", img2);
-        create_multi_landmark_image(img2, "AG", 2, 1, 0.5, 8, 0.0);
-        cv::imwrite("dbg_double.png", img2);
-#endif
     }
 
 
@@ -107,7 +92,8 @@ namespace cpoz
         const double thr_corr,
         const int thr_pix_rng,
         const int thr_pix_min,
-        const int thr_bgr_rng)
+        const int thr_bgr_rng,
+        const double thr_sqdiff)
     {
         // fix k to be odd and in range 9-15
         int fixk = ((k / 2) * 2) + 1;
@@ -119,18 +105,14 @@ namespace cpoz
         this->thr_pix_rng = thr_pix_rng;
         this->thr_pix_min = thr_pix_min;
         this->thr_bgr_rng = thr_bgr_rng;
+        this->thr_sqdiff = thr_sqdiff;
 
         // create the B&W matching templates
-        const grid_colors_t colors = PATTERN_MAP.find('0')->second;
         cv::Mat tmpl_bgr;
-        create_template_image(tmpl_bgr, kdim, colors);
+        create_template_image(tmpl_bgr, kdim, PATTERN_MAP.find('0')->second);
         cv::cvtColor(tmpl_bgr, tmpl_gray_p, cv::COLOR_BGR2GRAY);
-        cv::rotate(tmpl_gray_p, tmpl_gray_n, cv::ROTATE_90_CLOCKWISE);
-
-#if defined(_DEBUG) && defined(_DUMP_TEST_IMAGES)
-        imwrite("dbg_tmpl_gray_p.png", tmpl_gray_p);
-        imwrite("dbg_tmpl_gray_n.png", tmpl_gray_n);
-#endif
+        create_template_image(tmpl_bgr, kdim, PATTERN_MAP.find('1')->second);
+        cv::cvtColor(tmpl_bgr, tmpl_gray_n, cv::COLOR_BGR2GRAY);
 
         // stash offset for this template
         const int fixkh = kdim / 2;
@@ -143,13 +125,6 @@ namespace cpoz
         samp_ct = 0;
         samples = cv::Mat::zeros({ (kdim + 4) * sampx, (kdim + 4) * sampy }, CV_8UC3);
 #endif
-    }
-
-
-
-    bool BGRLandmark::init_shape_test(const std::string& rs)
-    {
-        return dct_fv.load(rs);
     }
 
 
@@ -208,7 +183,7 @@ namespace cpoz
             if ((rng_roi > thr_pix_rng) && (min_roi < thr_pix_min))
             {
                 // start filling in landmark info
-                landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi, -1 };
+                landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi, -1, 0.0 };
 
                 cv::Mat img_roi_bgr(rsrc_bgr(roi));
                 cv::Mat img_roi_gray(rsrc(roi));
@@ -243,9 +218,18 @@ namespace cpoz
 #endif
                 }
 #endif
+                // sqdiff shape test on equalized ROI
+                cv::Mat tmatchx;
+                cv::Mat img_roi_gray_equ;
+                cv::equalizeHist(img_roi_gray, img_roi_gray_equ);
+                cv::Mat& rtmpl = (lminfo.diff > 0) ? tmpl_gray_p : tmpl_gray_n;
+                matchTemplate(img_roi_gray_equ, rtmpl, tmatchx, cv::TM_SQDIFF_NORMED);
+                lminfo.rmatch = tmatchx.at<float>(0, 0);
+                bool is_sqdiff_test_ok = (lminfo.rmatch < thr_sqdiff);
+
                 // optional color test
                 bool is_color_test_ok = true;
-                if (is_color_id_enabled)
+                if (is_sqdiff_test_ok && is_color_id_enabled)
                 {
                     // use bilateral filter to suppress as much noise as possible in ROI
                     // while also preserving edges between colored regions
@@ -255,34 +239,7 @@ namespace cpoz
                     is_color_test_ok = (lminfo.code != -1);
                 }
 
-                // optional shape test
-                // this is only done if every other test has passed
-                bool is_shape_test_ok = true;
-                if (is_color_test_ok && dct_fv.is_loaded())
-                {
-#if 0
-                    std::vector<double> v;
-                    dct_fv.pattern_to_features(img_roi, v);
-                    size_t idx = (lminfo.diff > 0.0) ? 0 : 1;
-                    is_shape_test_ok = dct_fv.is_match(idx, v, &lminfo.rmatch);
-#else
-                    cv::Mat tmatchx;
-                    cv::Mat img_roi_gray_equ;
-                    cv::equalizeHist(img_roi_gray, img_roi_gray_equ);
-                    if (lminfo.diff > 0)
-                    {
-                        matchTemplate(img_roi_gray_equ, tmpl_gray_p, tmatchx, cv::TM_SQDIFF_NORMED);
-                    }
-                    else
-                    {
-                        matchTemplate(img_roi_gray_equ, tmpl_gray_n, tmatchx, cv::TM_SQDIFF_NORMED);
-                    }
-                    lminfo.rmatch = tmatchx.at<float>(0, 0);
-                    is_shape_test_ok = (lminfo.rmatch < 0.2);
-#endif
-                }
-
-                if (is_shape_test_ok && is_color_test_ok)
+                if (is_sqdiff_test_ok && is_color_test_ok)
                 {
                     // this is a landmark
                     rinfo.push_back(lminfo);
