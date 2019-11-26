@@ -188,13 +188,21 @@ namespace cpoz
                 cv::Mat img_roi_bgr(rsrc_bgr(roi));
                 cv::Mat img_roi_gray(rsrc(roi));
 
+                // use strong bilateral filter to suppress as much noise as possible in ROI
+                // while also preserving edges between colored regions
+                cv::Mat img_roi_bgr_filt;
+                cv::bilateralFilter(img_roi_bgr, img_roi_bgr_filt, 3, 200, 200);
+
+                // then convert filtered image to gray and equalize
+                cv::Mat img_filt_equ;
+                cv::cvtColor(img_roi_bgr_filt, img_filt_equ, cv::COLOR_BGR2GRAY);
+                cv::equalizeHist(img_filt_equ, img_filt_equ);
+
 #ifdef _COLLECT_SAMPLES
                 if (samp_ct < 1000)
                 {
-                    cv::Mat frel;
-                    cv::Mat grel;
-                    dct_fv.pattern_to_dct_8U(img_roi_gray, frel);
-                    cv::cvtColor(frel, grel, cv::COLOR_GRAY2BGR);
+                    cv::Mat img_samp;
+                    cv::cvtColor(img_filt_equ, img_samp, cv::COLOR_GRAY2BGR);
 
                     int k = tmpl_gray_p.size().width + 4;
                     int x = (samp_ct % sampx) * k;
@@ -204,10 +212,8 @@ namespace cpoz
                     // surround each sample with a white border that can be manually re-colored
                     cv::rectangle(samples, roi1, { 255,255,255 });
                     cv::Rect roi2 = { {x + 2, y + 2}, cv::Size(k - 4, k - 4) };
-                    //cv::Mat img_roi_bgr_proc;
-                    //cv::bilateralFilter(img_roi_bgr, img_roi_bgr_proc, 3, 200, 200);
 
-                    img_roi_bgr.copyTo(samples(roi2));
+                    img_samp.copyTo(samples(roi2));
                     samp_ct++;
 #if 0
                     x = (samp_ct % sampx) * k;
@@ -218,12 +224,10 @@ namespace cpoz
 #endif
                 }
 #endif
-                // sqdiff shape test on equalized ROI
+                // sqdiff shape test on filtered and equalized ROI
                 cv::Mat tmatchx;
-                cv::Mat img_roi_gray_equ;
-                cv::equalizeHist(img_roi_gray, img_roi_gray_equ);
                 cv::Mat& rtmpl = (lminfo.diff > 0) ? tmpl_gray_p : tmpl_gray_n;
-                matchTemplate(img_roi_gray_equ, rtmpl, tmatchx, cv::TM_SQDIFF_NORMED);
+                matchTemplate(img_filt_equ, rtmpl, tmatchx, cv::TM_SQDIFF_NORMED);
                 lminfo.rmatch = tmatchx.at<float>(0, 0);
                 bool is_sqdiff_test_ok = (lminfo.rmatch < thr_sqdiff);
 
@@ -231,11 +235,7 @@ namespace cpoz
                 bool is_color_test_ok = true;
                 if (is_sqdiff_test_ok && is_color_id_enabled)
                 {
-                    // use bilateral filter to suppress as much noise as possible in ROI
-                    // while also preserving edges between colored regions
-                    cv::Mat img_roi_bgr_proc;
-                    cv::bilateralFilter(img_roi_bgr, img_roi_bgr_proc, 3, 200, 200);
-                    identify_colors(img_roi_bgr_proc, lminfo);
+                    identify_colors(img_roi_bgr_filt, lminfo);
                     is_color_test_ok = (lminfo.code != -1);
                 }
 
