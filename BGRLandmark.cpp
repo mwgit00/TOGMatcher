@@ -343,7 +343,7 @@ namespace cpoz
         // draw the landmarks into the image
         // cycle through the label character string to pick current landmark pattern
         int k = 0;
-        int kmax = rslabels.size();
+        int kmax = static_cast<int>(rslabels.size());
         for (int j = 0; j < yrfix; j++)
         {
             for (int i = 0; i < xrfix; i++)
@@ -449,9 +449,9 @@ namespace cpoz
         double s0 = p0[0] + p0[1] + p0[2];
         double s1 = p1[0] + p1[1] + p1[2];
 
-        // see if there's enough range in BGR components
-        // for a valid yellow-magenta-cyan classification
-        if ((p0rng > thr_bgr_rng) && (p1rng > thr_bgr_rng))
+        // see if there's enough range in BGR components for valid yellow-magenta-cyan classification
+        // also apply small threshold to BGR "score" (larger threshold eliminates too many good matches)
+        if ((p0rng > thr_bgr_rng) && (p1rng > thr_bgr_rng) && (s0 > 1.1) && (s1 > 1.1))
         {
             const double BGR_EPS = 1.0e-6;
             int nc0 = -1;
