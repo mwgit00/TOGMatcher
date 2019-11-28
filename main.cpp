@@ -51,6 +51,7 @@ using namespace cv;
 #define SCA_GREEN   (cv::Scalar(0,255,0))
 #define SCA_YELLOW  (cv::Scalar(0,255,255))
 #define SCA_BLUE    (cv::Scalar(255,0,0))
+#define SCA_WHITE   (cv::Scalar(255,255,255))
 
 
 
@@ -134,20 +135,18 @@ void image_output(
         {
             Rect roi = Rect(rptmax, rptmax + (roffset * 2));
             rectangle(rimg, roi, SCA_GREEN, 1);
-            //circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
             break;
         }
         case max_mode_t::CIRCLE:
         {
             circle(rimg, ptcenter, 15, SCA_GREEN, 2);
-            //circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
             break;
         }
         case max_mode_t::CONTOUR:
         {
             // draw contours of best match with a yellow dot in the center
             drawContours(rimg, rcontours, -1, SCA_GREEN, 2, LINE_8, noArray(), INT_MAX, rptmax);
-            //circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
+            circle(rimg, ptcenter, 2, SCA_YELLOW, -1);
             break;
         }
         case max_mode_t::NONE:
@@ -238,8 +237,12 @@ void loop2(void)
     Mat img_gray;
     Mat tmatch;
 
+    const int kdim = 9;
+    const double dthr = 1.6;
 	cpoz::BGRLandmark bgrm;
-	Ptr<CLAHE> pCLAHE = createCLAHE();
+    bgrm.init(kdim, dthr);
+	
+    Ptr<CLAHE> pCLAHE = createCLAHE();
 
 	// need a 0 as argument
 	VideoCapture vcap(0);
@@ -313,13 +316,14 @@ void loop2(void)
                     {
                         char x[2] = { 0 };
                         x[0] = static_cast<char>(r.code) + 'A';
-                        circle(img_viewer, r.ctr, 7, (r.diff > 0.0) ? SCA_RED : SCA_BLUE, 3);
+                        circle(img_viewer, r.ctr, kdim / 2, (r.diff > 0.0) ? SCA_RED : SCA_BLUE, -1);
+                        circle(img_viewer, r.ctr, 2, SCA_WHITE, -1);
                         putText(img_viewer, std::string(x), r.ctr, FONT_HERSHEY_PLAIN, 2.0, SCA_GREEN, 2);
                     }
                 }
 
-                // in this loop, use mask flag as calibration grab mode
-                // the image is dumped to file if 12 unique landmarks found (3x4 pattern)
+                // when calibration mode is enabled
+                // the image is dumped to file if 12 unique landmarks found (4x3 pattern)
                 // then user must "hide" some landmarks to trigger another grab
                 if (theKnobs.get_cal_enabled())
                 {
@@ -385,7 +389,7 @@ void loop2(void)
                 const Point& tmpl_offset = bgrm.get_template_offset();
                 cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
-                match_mask = (tmatch > 0.9);// MATCH_DISPLAY_THRESHOLD);
+                match_mask = (tmatch > (dthr / 2.0));
                 findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
                 drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
                 max_mode = max_mode_t::RECT;
@@ -415,7 +419,7 @@ void loop2(void)
     if (theKnobs.get_cal_enabled())
     {
         // the BGRLandmark calibration pattern has 12 corners A-L in ordering shown below
-        // so the corners array must be initialized in same order
+        // so the grid points array must be initialized in same order
         // A D G J
         // B E H K
         // C F I L
@@ -774,33 +778,45 @@ void test_patt_rec()
         }
     }
 
-#if defined(_DEBUG) && defined(_DUMP_TEST_IMAGES)
-    for (int i = 0; i < 12; i++)
+    std::cout << "done" << std::endl;
+}
+
+
+
+void dump_bgrlm_patterns()
+{
+    // dump all patterns
+    for (const auto& r : cpoz::BGRLandmark::PATTERN_MAP)
     {
         cv::Mat img1;
-        char c = i + 'A';
+        char c = r.first;
         std::string s = "dbg_bgrlm_" + std::string(1, c) + ".png";
-        create_landmark_image(img1, 3.0, 0.25, PATTERN_MAP.find(c)->second, { 255,255,255 });
+        cpoz::BGRLandmark::create_landmark_image(
+            img1, 3.0, 0.25, r.second, { 255,255,255 });
         cv::imwrite(s, img1);
     }
+    
+    // dump a calibration image
     cv::Mat img2;
-    create_multi_landmark_image(img2, "ADGJBEHKCFIL", 4, 3, 0.5, 2.25, 0.25, { 192,192,192 });
+    cpoz::BGRLandmark::create_multi_landmark_image(
+        img2, cpoz::BGRLandmark::CALIB_LABELS, 4, 3, 0.5, 2.25, 0.25, { 192,192,192 });
     cv::imwrite("dbg_multi.png", img2);
-    create_multi_landmark_image(img2, "AG", 2, 1, 0.5, 8, 0.0);
+    
+    // dump a dual landmark image
+    cpoz::BGRLandmark::create_multi_landmark_image(img2, "AG", 2, 1, 0.5, 8, 0.0);
     cv::imwrite("dbg_double.png", img2);
-#endif
 
-    std::cout << "done" << std::endl;
+    // dump the gray templates
+    cpoz::BGRLandmark bgrm;
+    cv::imwrite("dbg_tmpl_gray_p.png", bgrm.get_template_p());
+    cv::imwrite("dbg_tmpl_gray_n.png", bgrm.get_template_n());
 }
 
 
 
 int main(int argc, char** argv)
 {
-    // uncomment lines below to test the PCA and DCT stuff and quit
-    //test_patt_rec();
-    //return 0;
-
+    dump_bgrlm_patterns();
     // uncomment lines below to test reading back cal data
     //std::vector<std::vector<cv::Vec2f>> vvcal;
     //std::vector<std::string> vcalfiles;

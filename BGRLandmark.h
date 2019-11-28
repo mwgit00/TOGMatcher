@@ -76,6 +76,9 @@ namespace cpoz
         // the supported landmark color patterns
         static const std::map<char, grid_colors_t> PATTERN_MAP;
 
+        // default corner labels for 4x3 calibration pattern
+        static const std::string CALIB_LABELS;
+
     public:
 
         BGRLandmark();
@@ -83,7 +86,7 @@ namespace cpoz
 
         // init with "good" default settings
         void init(
-            const int k = 13,
+            const int k = 9,
             const double thr_corr = 1.6,    // threshold for dual match (range is 0.0 to 2.0)
             const int thr_pix_rng = 40,     // grey image pixel range threshold for pre-proc
             const int thr_pix_min = 70,     // grey image dark pixel threshold for pre-proc
@@ -97,6 +100,9 @@ namespace cpoz
             const cv::Mat& rsrc,
             cv::Mat& rtmatch,
             std::vector<BGRLandmark::landmark_info_t>& rpts);
+
+        const cv::Mat& get_template_p(void) const { return tmpl_gray_p; }
+        const cv::Mat& get_template_n(void) const { return tmpl_gray_n; }
 
         // gets centering offset for the landmark template
         const cv::Point& get_template_offset(void) const { return tmpl_offset; }

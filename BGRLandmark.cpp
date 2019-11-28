@@ -60,6 +60,8 @@ namespace cpoz
         { 'L', { bgr_t::CYAN, bgr_t::BLACK, bgr_t::MAGENTA, bgr_t::BLACK }}
     };
 
+    const std::string BGRLandmark::CALIB_LABELS = "ADGJBEHKCFIL";
+
 
 
     // returns a value "railed" to fall within a max-min range
@@ -398,10 +400,6 @@ namespace cpoz
         // central point gets average of all squares
         cv::Scalar avg_all = (colors[0] + colors[1] + colors[2] + colors[3]) / 4;
         cv::line(rimg, { kh, kh }, { kh, kh }, avg_all);
-
-#if defined(_DEBUG) && defined(_DUMP_TEST_IMAGES)
-        cv::imwrite("dbg_tmpl_bgr.png", rimg);
-#endif
     }
 
 
