@@ -39,6 +39,7 @@
 
 
 #define MATCH_DISPLAY_THRESHOLD (0.8)           // arbitrary
+#define CALIB_PATH              ".\\calib\\"    // user may need to create or change this
 #define MOVIE_PATH              ".\\movie\\"    // user may need to create or change this
 #define DATA_PATH               ".\\data\\"     // user may need to change this
 
@@ -155,6 +156,12 @@ void image_output(
             break;
         }
     }
+
+    if (rknobs.get_cal_enabled())
+    {
+        cv::Rect box(Point(0, 0), rimg.size());
+        rectangle(rimg, box, SCA_YELLOW, 2);
+    }
     
     // save each frame to a file if recording
     if (rknobs.get_record_enabled())
@@ -221,7 +228,6 @@ void loop2(void)
     Knobs theKnobs;
     int op_id;
 
-    cv::FileStorage cvfs;
     std::vector<std::vector<cv::Vec2f>> vvcal;
     std::vector<std::string> vcalfiles;
     std::set<int> cal_label_set;
@@ -261,8 +267,6 @@ void loop2(void)
 	// use dummy operation to print initial Knobs settings message
 	// and force template to be loaded at start of loop
 	theKnobs.handle_keypress('0');
-
-    cvfs.open("cal_meta.yaml", cv::FileStorage::WRITE);
 
     // and the image processing loop is running...
     bool is_running = true;
@@ -327,7 +331,7 @@ void loop2(void)
                 // then user must "hide" some landmarks to trigger another grab
                 if (theKnobs.get_cal_enabled())
                 {
-                    if (cal_label_set.size() == 12)
+                    if ((qinfo.size() == 12) && (cal_label_set.size() == 12))
                     {
                         if (cal_good_ct < max_good_ct)
                         {
@@ -336,7 +340,7 @@ void loop2(void)
                             {
                                 // save image file
                                 std::ostringstream osx;
-                                osx << MOVIE_PATH << "img_" << std::setfill('0') << std::setw(5) << cal_ct << ".png";
+                                osx << CALIB_PATH << "img_" << std::setfill('0') << std::setw(5) << cal_ct << ".png";
                                 std::string sfile = osx.str();
                                 imwrite(sfile, img_viewer);
                                 vcalfiles.push_back(sfile);
@@ -351,6 +355,21 @@ void loop2(void)
                                 }
                                 vvcal.push_back(vimgpts);
                                 cal_ct++;
+                            }
+                            else
+                            {
+                                // not saving image so draw lines on calibration pattern in viewer
+                                std::sort(qinfo.begin(), qinfo.end(), cpoz::BGRLandmark::compare_by_code);
+                                cv::Point prev(0, 0);
+                                for (const auto& r : qinfo)
+                                {
+                                    cv::Point pt(r.ctr);
+                                    if (prev != cv::Point(0, 0))
+                                    {
+                                        cv::line(img_viewer, prev, pt, SCA_YELLOW, 1);
+                                    }
+                                    prev = pt;
+                                }
                             }
                         }
                     }
@@ -433,12 +452,18 @@ void loop2(void)
                 vgridpts.push_back(cv::Point3f(float(j * grid_square), float(i * grid_square), 0));
             }
         }
+
+        cv::FileStorage cvfs;
+        std::string spath = CALIB_PATH;
+        spath += "cal_meta.yaml";
+        cvfs.open(spath, cv::FileStorage::WRITE);
         cvfs << "image_size" << capture_size;
         cvfs << "grid_size" << board_size;
         cvfs << "grid_square" << grid_square;
         cvfs << "grid_pts" << vgridpts;
         cvfs << "files" << vcalfiles;
         cvfs << "points" << vvcal;
+        cvfs.release();
     }
 }
 
@@ -816,7 +841,6 @@ void dump_bgrlm_patterns()
 
 int main(int argc, char** argv)
 {
-    dump_bgrlm_patterns();
     // uncomment lines below to test reading back cal data
     //std::vector<std::vector<cv::Vec2f>> vvcal;
     //std::vector<std::string> vcalfiles;
