@@ -248,8 +248,6 @@ void loop2(void)
 	cpoz::BGRLandmark bgrm;
     bgrm.init(kdim, dthr);
 	
-    Ptr<CLAHE> pCLAHE = createCLAHE();
-
 	// need a 0 as argument
 	VideoCapture vcap(0);
 	if (!vcap.isOpened())
@@ -286,14 +284,6 @@ void loop2(void)
         // combine all channels into grayscale
         cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);
 
-        // apply the current histogram equalization setting
-        if (theKnobs.get_equ_hist_enabled())
-        {
-            double c = theKnobs.get_clip_limit();
-            pCLAHE->setClipLimit(c);
-            pCLAHE->apply(img_gray, img_gray);
-        }
-
         // look for landmarks
         std::vector<cpoz::BGRLandmark::landmark_info_t> qinfo;
         bgrm.perform_match(img_viewer, img_gray, tmatch, qinfo);
@@ -326,40 +316,46 @@ void loop2(void)
                     }
                 }
 
+                // and check for proper quantity and uniqueness
+                bool is_good_grid = ((qinfo.size() == 12) && (cal_label_set.size() == 12));
+
                 // when calibration mode is enabled
                 // the image is dumped to file if 12 unique landmarks found (4x3 pattern)
                 // then user must "hide" some landmarks to trigger another grab
                 if (theKnobs.get_cal_enabled())
                 {
-                    if ((qinfo.size() == 12) && (cal_label_set.size() == 12))
+                    // sort landmark info by label code so it's in proper order for calib.
+                    std::sort(qinfo.begin(), qinfo.end(), cpoz::BGRLandmark::compare_by_code);
+
+                    if (is_good_grid)
                     {
                         if (cal_good_ct < max_good_ct)
                         {
                             cal_good_ct++;
                             if (cal_good_ct == max_good_ct)
                             {
-                                // save image file
+                                // save calib. image file
                                 std::ostringstream osx;
-                                osx << CALIB_PATH << "img_" << std::setfill('0') << std::setw(5) << cal_ct << ".png";
+                                osx << "img_" << std::setfill('0') << std::setw(4) << cal_ct << ".png";
                                 std::string sfile = osx.str();
-                                imwrite(sfile, img_viewer);
+                                imwrite(CALIB_PATH + sfile, img_viewer);
                                 vcalfiles.push_back(sfile);
                                 std::cout << "CALIB. SNAP " << sfile << std::endl;
 
-                                // sort image points by label code
+                                // store the landmark locations
                                 std::vector<cv::Vec2f> vimgpts;
-                                std::sort(qinfo.begin(), qinfo.end(), cpoz::BGRLandmark::compare_by_code);
                                 for (const auto& r : qinfo)
                                 {
-                                    vimgpts.push_back(cv::Vec2f(r.ctr.x, r.ctr.y));
+                                    vimgpts.push_back(cv::Vec2f(
+                                        static_cast<float>(r.ctr.x),
+                                        static_cast<float>(r.ctr.y)));
                                 }
                                 vvcal.push_back(vimgpts);
                                 cal_ct++;
                             }
                             else
                             {
-                                // not saving image so draw lines on calibration pattern in viewer
-                                std::sort(qinfo.begin(), qinfo.end(), cpoz::BGRLandmark::compare_by_code);
+                                // not saving image so draw lines connecting corners
                                 cv::Point prev(0, 0);
                                 for (const auto& r : qinfo)
                                 {
@@ -375,6 +371,7 @@ void loop2(void)
                     }
                     else
                     {
+                        // missed grid detection so start over with countdown
                         cal_good_ct = 0;
                     }
                 }
@@ -705,7 +702,7 @@ void test_patt_rec()
         prfoo.get_dct_fv().features_to_pattern(samp_dct, img_test);
         cv::imwrite("dbg_test_pca.png", img_test);
 
-#if 1
+#if 0
         for (size_t ii = 0; ii < 20; ii++)
         {
             cv::Mat samp_p = mypca.project(prfoo.get_p_sample(ii));
@@ -841,14 +838,6 @@ void dump_bgrlm_patterns()
 
 int main(int argc, char** argv)
 {
-    // uncomment lines below to test reading back cal data
-    //std::vector<std::vector<cv::Vec2f>> vvcal;
-    //std::vector<std::string> vcalfiles;
-    //cv::FileStorage cvfs;
-    //cvfs.open("cal_meta.yaml", cv::FileStorage::READ);
-    //cvfs["files"] >> vcalfiles;
-    //cvfs["points"] >> vvcal;
-
 // change 0 to 1 to switch test loops
 #if 1
     // test BGRLandmark
