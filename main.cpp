@@ -84,6 +84,34 @@ size_t nfile = 0U;
 
 
 
+bool check_order(
+    const std::vector<int>& rvec,
+    const std::map<int, cpoz::BGRLandmark::landmark_info_t>& rmap,
+    const int mode)
+{
+    bool result = true;
+    for (size_t ii = 1; ii < rvec.size(); ii++)
+    {
+        const Point p1 = rmap.at(rvec[ii]).ctr;
+        const Point p0 = rmap.at(rvec[ii - 1]).ctr;
+
+        if ((mode == 0) && (p0.x >= p1.x))
+        {
+            result = false;
+            break;
+        }
+
+        if ((mode == 1) && (p0.y >= p1.y))
+        {
+            result = false;
+            break;
+        }
+    }
+    return result;
+}
+
+
+
 bool wait_and_check_keys(Knobs& rknobs)
 {
     bool result = true;
@@ -228,9 +256,9 @@ void loop2(void)
     Knobs theKnobs;
     int op_id;
 
+    std::map<int, cpoz::BGRLandmark::landmark_info_t> cal_label_map;
     std::vector<std::vector<cv::Vec2f>> vvcal;
     std::vector<std::string> vcalfiles;
-    std::set<int> cal_label_set;
     int cal_good_ct = 0;
     int cal_ct = 0;
     
@@ -302,10 +330,11 @@ void loop2(void)
             {
                 // draw circles around all BGR landmarks and put labels by each one
                 // unless about to snap a calibration image which can't have the circles
-                cal_label_set.clear();
+                // also insert items into map which will also sort them by code
+                cal_label_map.clear();
                 for (const auto& r : qinfo)
                 {
-                    cal_label_set.insert(r.code);
+                    cal_label_map[r.code] = r;
                     if ((cal_good_ct < (max_good_ct - 3)) || (cal_good_ct >= max_good_ct))
                     {
                         char x[2] = { 0 };
@@ -316,17 +345,27 @@ void loop2(void)
                     }
                 }
 
-                // and check for proper quantity and uniqueness
-                bool is_good_grid = ((qinfo.size() == 12) && (cal_label_set.size() == 12));
+                // check for proper quantity and uniqueness
+                // and do a sanity check to make sure everything lines up properly
+                bool is_good_grid = ((qinfo.size() == 12) && (cal_label_map.size() == 12));
+                if (is_good_grid)
+                {
+                    bool y1 = check_order({ 0,1,2 }, cal_label_map, 1);
+                    bool y2 = check_order({ 3,4,5 }, cal_label_map, 1);
+                    bool y3 = check_order({ 6,7,8 }, cal_label_map, 1);
+                    bool y4 = check_order({ 9,10,11 }, cal_label_map, 1);
+                    bool x1 = check_order({ 0,3,6,9 }, cal_label_map, 0);
+                    bool x2 = check_order({ 1,4,7,10 }, cal_label_map, 0);
+                    bool x3 = check_order({ 2,5,8,11 }, cal_label_map, 0);
+                    is_good_grid = y1 && y2 && y3 && y4 && x1 && x2 && x3;
+                }
 
                 // when calibration mode is enabled
-                // the image is dumped to file if 12 unique landmarks found (4x3 pattern)
+                // the image is dumped to file if pattern passes all the checks
+                // lines connecting landmarks go away after image is saved
                 // then user must "hide" some landmarks to trigger another grab
                 if (theKnobs.get_cal_enabled())
                 {
-                    // sort landmark info by label code so it's in proper order for calib.
-                    std::sort(qinfo.begin(), qinfo.end(), cpoz::BGRLandmark::compare_by_code);
-
                     if (is_good_grid)
                     {
                         if (cal_good_ct < max_good_ct)
@@ -344,11 +383,11 @@ void loop2(void)
 
                                 // store the landmark locations
                                 std::vector<cv::Vec2f> vimgpts;
-                                for (const auto& r : qinfo)
+                                for (const auto& r : cal_label_map)
                                 {
                                     vimgpts.push_back(cv::Vec2f(
-                                        static_cast<float>(r.ctr.x),
-                                        static_cast<float>(r.ctr.y)));
+                                        static_cast<float>(r.second.ctr.x),
+                                        static_cast<float>(r.second.ctr.y)));
                                 }
                                 vvcal.push_back(vimgpts);
                                 cal_ct++;
@@ -357,9 +396,9 @@ void loop2(void)
                             {
                                 // not saving image so draw lines connecting corners
                                 cv::Point prev(0, 0);
-                                for (const auto& r : qinfo)
+                                for (const auto& r : cal_label_map)
                                 {
-                                    cv::Point pt(r.ctr);
+                                    cv::Point pt(r.second.ctr);
                                     if (prev != cv::Point(0, 0))
                                     {
                                         cv::line(img_viewer, prev, pt, SCA_YELLOW, 1);
@@ -827,6 +866,10 @@ void dump_bgrlm_patterns()
     // dump a dual landmark image
     cpoz::BGRLandmark::create_multi_landmark_image(img2, "AG", 2, 1, 0.5, 8, 0.0);
     cv::imwrite("dbg_double.png", img2);
+
+    // dump a quad landmark image
+    cpoz::BGRLandmark::create_multi_landmark_image(img2, "AGKE", 2, 2, 1.0, 6.0, 0.0);
+    cv::imwrite("dbg_quad.png", img2);
 
     // dump the gray templates
     cpoz::BGRLandmark bgrm;
