@@ -97,9 +97,9 @@ namespace cpoz
         const int thr_bgr_rng,
         const double thr_sqdiff)
     {
-        // fix k to be odd and in range 9-15
+        // fix k to be odd and in range 7-15
         int fixk = ((k / 2) * 2) + 1;
-        kdim = apply_rail<int>(fixk, 9, 15);
+        kdim = apply_rail<int>(fixk, 7, 15);
 
         // apply thresholds
         // TODO -- assert type is CV_8U somewhere during match
@@ -188,12 +188,10 @@ namespace cpoz
                 landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi, -1, 0.0 };
 
                 cv::Mat img_roi_bgr(rsrc_bgr(roi));
-                cv::Mat img_roi_gray(rsrc(roi));
-
-                // use strong bilateral filter to suppress as much noise as possible in ROI
-                // while also preserving edges between colored regions
                 cv::Mat img_roi_bgr_filt;
-                cv::bilateralFilter(img_roi_bgr, img_roi_bgr_filt, 3, 200, 200);
+
+                // do smoothing of BGR ROI prior to color test
+                cv::medianBlur(img_roi_bgr, img_roi_bgr_filt, 3);
 
                 // then convert filtered image to gray and equalize
                 cv::Mat img_filt_equ;
@@ -226,7 +224,7 @@ namespace cpoz
 #endif
                 }
 #endif
-                // sqdiff shape test on filtered and equalized ROI
+                // sqdiff shape test on filtered, gray, equalized ROI
                 cv::Mat tmatchx;
                 cv::Mat& rtmpl = (lminfo.diff > 0) ? tmpl_gray_p : tmpl_gray_n;
                 matchTemplate(img_filt_equ, rtmpl, tmatchx, cv::TM_SQDIFF_NORMED);
@@ -414,57 +412,75 @@ namespace cpoz
             {1, 1, 0},  // B,G,0 cyan 
         };
 
-        cv::Vec3f p0;
-        cv::Vec3f p1;
+        cv::Vec3f pc0;
+        cv::Vec3f pc1;
+        cv::Vec3f pg0;
+        cv::Vec3f pg1;
 
-        // find BGR at appropriate colored corners
+        // sample the corners
+        // locations are offset by 1 pixel in X and Y and filtering is 3x3 
+        // so each sample will be 9 unique pixels smoothed together
         if (rinfo.diff > 0)
         {
             // "positive" landmark
-            p0 = rimg.at<cv::Vec3b>(0, kdim - 1);
-            p1 = rimg.at<cv::Vec3b>(kdim - 1, 0);
+            pg0 = rimg.at<cv::Vec3b>(1, 1);
+            pg1 = rimg.at<cv::Vec3b>(kdim - 2, kdim - 2);
+            pc0 = rimg.at<cv::Vec3b>(1, kdim - 2);
+            pc1 = rimg.at<cv::Vec3b>(kdim - 2, 1);
         }
         else
         {
             // "negative" landmark
-            p0 = rimg.at<cv::Vec3b>(0, 0);
-            p1 = rimg.at<cv::Vec3b>(kdim - 1, kdim - 1);
+            pg0 = rimg.at<cv::Vec3b>(1, kdim - 2);
+            pg1 = rimg.at<cv::Vec3b>(kdim - 2, 1);
+            pc0 = rimg.at<cv::Vec3b>(1, 1);
+            pc1 = rimg.at<cv::Vec3b>(kdim - 2, kdim - 2);
         }
 
-        // get pixel value ranges for corners
+        // get pixel value ranges for colored corners
         double p0max, p0min, p0rng;
         double p1max, p1min, p1rng;
-        cv::minMaxLoc(p0, &p0min, &p0max);
-        cv::minMaxLoc(p1, &p1min, &p1max);
+        cv::minMaxLoc(pc0, &p0min, &p0max);
+        cv::minMaxLoc(pc1, &p1min, &p1max);
         p0rng = p0max - p0min;
         p1rng = p1max - p1min;
 
+        // get gray level for "black" corners
+        // gray = 0.299 R + 0.587 G + 0.114 B
+        double pg0gray = (pg0[0] * 0.114 + pg0[1] * 0.587 + pg0[2] * 0.299);
+        double pg1gray = (pg1[0] * 0.114 + pg1[1] * 0.587 + pg1[2] * 0.299);
+        double pc0gray = (pc0[0] * 0.114 + pc0[1] * 0.587 + pc0[2] * 0.299);
+        double pc1gray = (pc1[0] * 0.114 + pc1[1] * 0.587 + pc1[2] * 0.299);
+
         // then normalize the BGR components for each corner
         // each value will fall in range 0-1
-        cv::normalize(p0, p0, 0, 1, cv::NORM_MINMAX);
-        cv::normalize(p1, p1, 0, 1, cv::NORM_MINMAX);
+        cv::Vec3f pc0n;
+        cv::Vec3f pc1n;
+        cv::normalize(pc0, pc0n, 0, 1, cv::NORM_MINMAX);
+        cv::normalize(pc1, pc1n, 0, 1, cv::NORM_MINMAX);
 
-        // this BGR "score" (sum of all components) should range from 1 to 2
-        // something in the middle means a yellow-magenta-cyan match can be performed
-        double s0 = p0[0] + p0[1] + p0[2];
-        double s1 = p1[0] + p1[1] + p1[2];
-
-        // see if there's enough range in BGR components for valid yellow-magenta-cyan classification
-        // also apply small threshold to BGR "score" (larger threshold eliminates too many good matches)
-        if ((p0rng > thr_bgr_rng) && (p1rng > thr_bgr_rng) && (s0 > 1.1) && (s1 > 1.1))
+        // see if there's enough range in BGR components for color classification
+        if ((p0rng > thr_bgr_rng) && (p1rng > thr_bgr_rng))
         {
-            const double BGR_EPS = 1.0e-6;
-            int nc0 = -1;
-            int nc1 = -1;
-            // classify yellow-magenta-cyan for the two colored corner pixels
-            // by determing which component is a "absent" or minimum (normalized to 0)
-            if (p0[0] < BGR_EPS) nc0 = 0;
-            if (p0[1] < BGR_EPS) nc0 = 1;
-            if (p0[2] < BGR_EPS) nc0 = 2;
-            if (p1[0] < BGR_EPS) nc1 = 0;
-            if (p1[1] < BGR_EPS) nc1 = 1;
-            if (p1[2] < BGR_EPS) nc1 = 2;
-            rinfo.code = get_bgr_code(rinfo.diff, nc0, nc1);
+            // sanity check to see if black corners are dark and colored corners are bright
+            // one color can be brighter than the other so threshold is set at 33% of range
+            double qminthr = rinfo.min + (rinfo.rng * 0.333);
+            if ((pg0gray < qminthr) && (pg1gray < qminthr) &&
+                (pc0gray >= qminthr) && (pc1gray >= qminthr))
+            { 
+                const double BGR_EPS = 1.0e-6;
+                int nc0 = -1;
+                int nc1 = -1;
+                // classify yellow-magenta-cyan for the two colored corner pixels
+                // by determing which component is a "absent" or minimum (normalized to 0)
+                if (pc0n[0] < BGR_EPS) nc0 = 0;
+                if (pc0n[1] < BGR_EPS) nc0 = 1;
+                if (pc0n[2] < BGR_EPS) nc0 = 2;
+                if (pc1n[0] < BGR_EPS) nc1 = 0;
+                if (pc1n[1] < BGR_EPS) nc1 = 1;
+                if (pc1n[2] < BGR_EPS) nc1 = 2;
+                rinfo.code = get_bgr_code(rinfo.diff, nc0, nc1);
+            }
         }
     }
 
