@@ -73,6 +73,14 @@ namespace cpoz
 
 
 
+    static double bgr_to_gray(const cv::Vec3b& rv)
+    {
+        // gray = 0.299 R + 0.587 G + 0.114 B
+        return (rv[0] * 0.114 + rv[1] * 0.587 + rv[2] * 0.299);
+    }
+
+
+
     BGRLandmark::BGRLandmark()
     {
         init();
@@ -404,14 +412,6 @@ namespace cpoz
 
     void BGRLandmark::identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_info_t& rinfo) const
     {
-        int result = -1;
-        const cv::Vec3f norm_ycm[3] =
-        {
-            {0, 1, 1},  // 0,G,R yellow
-            {1, 0, 1},  // B,0,R magenta
-            {1, 1, 0},  // B,G,0 cyan 
-        };
-
         cv::Vec3f pc0;
         cv::Vec3f pc1;
         cv::Vec3f pg0;
@@ -445,23 +445,15 @@ namespace cpoz
         p0rng = p0max - p0min;
         p1rng = p1max - p1min;
 
-        // get gray level for "black" corners
-        // gray = 0.299 R + 0.587 G + 0.114 B
-        double pg0gray = (pg0[0] * 0.114 + pg0[1] * 0.587 + pg0[2] * 0.299);
-        double pg1gray = (pg1[0] * 0.114 + pg1[1] * 0.587 + pg1[2] * 0.299);
-        double pc0gray = (pc0[0] * 0.114 + pc0[1] * 0.587 + pc0[2] * 0.299);
-        double pc1gray = (pc1[0] * 0.114 + pc1[1] * 0.587 + pc1[2] * 0.299);
-
-        // then normalize the BGR components for each corner
-        // each value will fall in range 0-1
-        cv::Vec3f pc0n;
-        cv::Vec3f pc1n;
-        cv::normalize(pc0, pc0n, 0, 1, cv::NORM_MINMAX);
-        cv::normalize(pc1, pc1n, 0, 1, cv::NORM_MINMAX);
-
         // see if there's enough range in BGR components for color classification
         if ((p0rng > thr_bgr_rng) && (p1rng > thr_bgr_rng))
         {
+            // get gray level for all corners
+            double pg0gray = bgr_to_gray(pg0);
+            double pg1gray = bgr_to_gray(pg1);
+            double pc0gray = bgr_to_gray(pc0);
+            double pc1gray = bgr_to_gray(pc1);
+
             // sanity check to see if black corners are dark and colored corners are bright
             // one color can be brighter than the other so threshold is set at 33% of range
             double qminthr = rinfo.min + (rinfo.rng * 0.333);
@@ -471,6 +463,14 @@ namespace cpoz
                 const double BGR_EPS = 1.0e-6;
                 int nc0 = -1;
                 int nc1 = -1;
+
+                // normalize the BGR components for each corner
+                // each component will be in range 0-1
+                cv::Vec3f pc0n;
+                cv::Vec3f pc1n;
+                cv::normalize(pc0, pc0n, 0, 1, cv::NORM_MINMAX);
+                cv::normalize(pc1, pc1n, 0, 1, cv::NORM_MINMAX);
+
                 // classify yellow-magenta-cyan for the two colored corner pixels
                 // by determing which component is a "absent" or minimum (normalized to 0)
                 if (pc0n[0] < BGR_EPS) nc0 = 0;
@@ -490,6 +490,7 @@ namespace cpoz
     {
         // a and b must be in range [0,1,2] and must not be equal
         // otherwise the code conversion won't work
+        // positive pattern is code 0-5, negative pattern is code 6-11
         int code = -1;
         if ((a != b) && (a >= 0) && (a <= 2) && (b >= 0) && (b <= 2))
         {
@@ -505,7 +506,7 @@ namespace cpoz
             {
                 code = (b == 0) ? 4 : 5;  // 2,0 or 2,1
             }
-            if (s < 0.0) code += 6;
+            if (s < 0.0) code += 6; // negative pattern
         }
         return code;
     }
