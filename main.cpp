@@ -249,6 +249,125 @@ void reload_template(TOGMatcher& rtogm, const T_file_info& rinfo, const int ksiz
 
 
 
+void loop_color_detect(void)
+{
+    Knobs theKnobs;
+    int op_id;
+
+    double qmax = 0.0;
+    Size capture_size;
+    Point ptmax;
+
+    Mat img;
+    Mat img_viewer;
+    Mat img_conv;
+
+    // need a 0 as argument
+    VideoCapture vcap(0);
+    if (!vcap.isOpened())
+    {
+        std::cout << "Failed to open VideoCapture device!" << std::endl;
+        ///////
+        return;
+        ///////
+    }
+
+    // camera is ready so grab a first image to determine its full size
+    vcap >> img;
+    capture_size = img.size();
+
+    // and the image processing loop is running...
+    bool is_running = true;
+
+    while (is_running)
+    {
+        // grab image
+        vcap >> img;
+
+        // apply the current image scale setting
+        double img_scale = 0.5;
+        Size viewer_size = Size(
+            static_cast<int>(capture_size.width * img_scale),
+            static_cast<int>(capture_size.height * img_scale));
+        resize(img, img_viewer, viewer_size);
+
+        Mat all = Mat(capture_size, CV_8UC3);
+
+#if 1
+        // HSV -> (0-179, 0-255, 0-255)
+        // HSV neon pink -> B(H) 160-179, G(S) 120-190, R(V) don't care
+        cvtColor(img_viewer, img_conv, COLOR_BGR2HSV);
+        std::vector<uint8_t> vlo = { 160, 120, 0 };
+        std::vector<uint8_t> vhi = { 179, 190, 255 };
+#else
+        // YUV neon pink -> B(Y) don't care, G(U) 120-160, R(V) 165-215
+        cvtColor(img_viewer, img_conv, COLOR_BGR2YUV);
+        std::vector<uint8_t> vlo = { 0, 120, 165 };
+        std::vector<uint8_t> vhi = { 255, 160, 215 };
+#endif
+
+        // apply the current output mode
+        // content varies but all final output images are BGR
+        max_mode_t max_mode = max_mode_t::NONE;
+        switch (theKnobs.get_output_mode())
+        {
+        case Knobs::OUT_AUX:
+        case Knobs::OUT_RAW:
+        case Knobs::OUT_MASK:
+        {
+            Mat img_thr;
+            Mat conv_chan[3];
+            cv::split(img_conv, conv_chan);
+            max_mode = max_mode_t::RECT;
+
+            // thresholding to match color
+            inRange(img_conv, vlo, vhi, img_thr);
+            qmax = countNonZero(img_thr);
+
+            Mat aa, bb;
+            Rect roi00 = Rect(0, 0, viewer_size.width, viewer_size.height);
+            Rect roi01 = Rect(viewer_size.width, 0, viewer_size.width, viewer_size.height);
+            Rect roi10 = Rect(0, viewer_size.height, viewer_size.width, viewer_size.height);
+            Rect roi11 = Rect(viewer_size.width, viewer_size.height, viewer_size.width, viewer_size.height);
+
+            cvtColor(img_thr, aa, COLOR_GRAY2BGR);
+            cvtColor(conv_chan[0], bb, COLOR_GRAY2BGR);
+            aa.copyTo(all(roi00));
+            img_viewer.copyTo(all(roi01));
+            img_conv.copyTo(all(roi10));
+            bb.copyTo(all(roi11));
+            break;
+        }
+        case Knobs::OUT_COLOR:
+        default:
+        {
+            // no extra output processing
+            max_mode = max_mode_t::NONE;
+            break;
+        }
+        }
+
+        // always show best match contour and target dot on BGR image
+        image_output(all, qmax, { 9,9 }, theKnobs, { 3,3 }, {}, max_mode);
+
+        // handle keyboard events and end when ESC is pressed
+        is_running = wait_and_check_keys(theKnobs);
+
+        if (theKnobs.get_mask_enabled())
+        {
+            // hack to dump screenshot and quit if 'm' is pressed
+            imwrite("pink_ball.png", img_conv);
+            is_running = false;
+        }
+    }
+
+    // when everything is done, release the capture device and windows
+    vcap.release();
+    cv::destroyAllWindows();
+}
+
+
+
 void loop2(void)
 {
     const int max_good_ct = 20;
