@@ -210,7 +210,8 @@ namespace cpoz
                 if (samp_ct < 1000)
                 {
                     cv::Mat img_samp;
-                    cv::cvtColor(img_filt_equ, img_samp, cv::COLOR_GRAY2BGR);
+                    //cv::cvtColor(img_filt_equ, img_samp, cv::COLOR_GRAY2BGR);
+                    cv::cvtColor(img_roi_bgr_filt, img_samp, cv::COLOR_BGR2HSV);
 
                     int k = tmpl_gray_p.size().width + 4;
                     int x = (samp_ct % sampx) * k;
@@ -471,7 +472,7 @@ namespace cpoz
                 cv::normalize(pc0, pc0n, 0, 1, cv::NORM_MINMAX);
                 cv::normalize(pc1, pc1n, 0, 1, cv::NORM_MINMAX);
 
-                // classify yellow-magenta-cyan for the two colored corner pixels
+                // classify yellow-magenta-cyan (0,1,2) for the two colored corner pixels
                 // by determing which component is a "absent" or minimum (normalized to 0)
                 if (pc0n[0] < BGR_EPS) nc0 = 0;
                 if (pc0n[1] < BGR_EPS) nc0 = 1;
@@ -482,6 +483,74 @@ namespace cpoz
                 rinfo.code = get_bgr_code(rinfo.diff, nc0, nc1);
             }
         }
+    }
+
+
+
+    void BGRLandmark::identify_colors_thr(const cv::Mat& rimg, BGRLandmark::landmark_info_t& rinfo) const
+    {
+        cv::Vec3b pc0;
+        cv::Vec3b pc1;
+        cv::Vec3b pg0;
+        cv::Vec3b pg1;
+
+        // convert b001,b010,b100 -> 0,1,2
+        const int bitcode[5] = { -1, 0, 1, -1, 2 };
+        uint8_t xx = 2;
+
+        // 80-150 original S
+
+        // HSV yellow (12-25)
+        cv::Vec3b vlo0 = { 3, 70, 0 };
+        cv::Vec3b vhi0 = { 34, 160, 255 };
+        
+        // HSV magenta (154-170)
+        cv::Vec3b vlo1 = { 145, 70, 0 };
+        cv::Vec3b vhi1 = { 179, 160, 255 };
+        
+        // HSV cyan (96-110)
+        cv::Vec3b vlo2 = { 87, 70, 0 };
+        cv::Vec3b vhi2 = { 119, 160, 255 };
+
+        cv::Mat ximg;
+        cv::cvtColor(rimg, ximg, cv::COLOR_BGR2HSV);
+
+        // sample the corners
+        // locations are offset by 1 pixel in X and Y and filtering is 3x3 
+        // so each sample will be 9 unique pixels smoothed together
+        if (rinfo.diff > 0)
+        {
+            // "positive" landmark
+            pg0 = ximg.at<cv::Vec3b>(1, 1);
+            pg1 = ximg.at<cv::Vec3b>(kdim - 2, kdim - 2);
+            pc0 = ximg.at<cv::Vec3b>(1, kdim - 2);
+            pc1 = ximg.at<cv::Vec3b>(kdim - 2, 1);
+        }
+        else
+        {
+            // "negative" landmark
+            pg0 = ximg.at<cv::Vec3b>(1, kdim - 2);
+            pg1 = ximg.at<cv::Vec3b>(kdim - 2, 1);
+            pc0 = ximg.at<cv::Vec3b>(1, 1);
+            pc1 = ximg.at<cv::Vec3b>(kdim - 2, kdim - 2);
+        }
+
+        cv::Mat x00, x01, x02;
+        cv::Mat x10, x11, x12;
+        
+        cv::inRange(pc0, vlo0, vhi0, x00);
+        cv::inRange(pc0, vlo1, vhi1, x01);
+        cv::inRange(pc0, vlo2, vhi2, x02);
+        cv::inRange(pc1, vlo0, vhi0, x10);
+        cv::inRange(pc1, vlo1, vhi1, x11);
+        cv::inRange(pc1, vlo2, vhi2, x12);
+        int a = (x00.at<uint8_t>(0, 0) & 1) |
+                ((x01.at<uint8_t>(0, 0) & 1) << 1) |
+                ((x02.at<uint8_t>(0, 0) & 1) << 2);
+        int b = (x10.at<uint8_t>(0, 0) & 1) |
+            ((x11.at<uint8_t>(0, 0) & 1) << 1) |
+            ((x12.at<uint8_t>(0, 0) & 1) << 2);
+        rinfo.code = get_bgr_code(rinfo.diff, bitcode[a], bitcode[b]);
     }
 
 

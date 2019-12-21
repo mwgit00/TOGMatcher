@@ -20,6 +20,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#include <iostream>
 #include <fstream>
 #include <algorithm>
 #include "opencv2/highgui.hpp"
@@ -198,6 +199,12 @@ bool PatternRec::load_samples_from_img(
     std::vector<std::vector<double>> vvn;
     std::vector<std::vector<double>> vv0;
 
+#if 0
+    std::vector<uint8_t> xmin = { 255,255,255,255 };
+    std::vector<uint8_t> xmax = { 0,0,0,0 };
+    std::vector<uint8_t> xxxx[4];
+#endif
+
     // loop through all the sample images...
     for (int j = 0; j < SAMP_NUM_Y; j++)
     {
@@ -212,6 +219,24 @@ bool PatternRec::load_samples_from_img(
             cv::Rect roi(pt2, sz_roi);
             cv::Mat img_roi = img_gray(roi);
             cv::Scalar bgr_pixel = img.at<cv::Vec3b>(pt1);
+
+#if 0
+            {
+                // color stuff
+                cv::Mat img_x = img(roi);
+                cv::Vec3b xpix[4];
+                xpix[0] = img_x.at<cv::Vec3b>(cv::Point{ 0, 0 });
+                xpix[1] = img_x.at<cv::Vec3b>(cv::Point{ 0, 8 });
+                xpix[2] = img_x.at<cv::Vec3b>(cv::Point{ 8, 0 });
+                xpix[3] = img_x.at<cv::Vec3b>(cv::Point{ 8, 8 });
+                for (int i = 0; i < 4; i++)
+                {
+                    xmin[i] = std::min(xmin[i], xpix[i][0]);
+                    xmax[i] = std::max(xmax[i], xpix[i][0]);
+                    xxxx[i].push_back(xpix[i][1]);
+                }
+            }
+#endif
 
             // these should all match because they were captured with same settings
             cv::Mat img_match;
@@ -240,6 +265,18 @@ bool PatternRec::load_samples_from_img(
             }
         }
     }
+
+#if 0
+    for (int i = 0; i < 4; i++)
+    {
+        std::sort(xxxx[i].begin(), xxxx[i].end());
+        for (const auto& r : xxxx[i])
+        {
+            std::cout << static_cast<int>(r) << std::endl;
+        }
+        std::cout << "--------------------------------------" << std::endl;
+    }
+#endif
 
     // the samples have a crude ordering based on how they were collected
     // so shuffle in case we don't want to use all the samples

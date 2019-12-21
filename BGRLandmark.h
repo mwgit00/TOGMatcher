@@ -153,6 +153,9 @@ namespace cpoz
         // and tries to identify the colors in the non-black squares
         void identify_colors(const cv::Mat& rimg, BGRLandmark::landmark_info_t& rinfo) const;
 
+        // EXPERIMENTAL (HSV threshold color match)
+        void identify_colors_thr(const cv::Mat& rimg, BGRLandmark::landmark_info_t& rinfo) const;
+
         // converts the "sign" of the landmark and its 2 bright colors into a single code
         static int get_bgr_code(double s, const int a, const int b);
 
