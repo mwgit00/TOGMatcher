@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2019 Mark Whitney
+// Copyright(c) 2020 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -88,8 +88,8 @@ namespace cpoz
         void init(
             const int k = 9,
             const double thr_corr = 1.6,    // threshold for dual match (range is 0.0 to 2.0)
-            const int thr_pix_rng = 40,     // grey image pixel range threshold for pre-proc
-            const int thr_pix_min = 70,     // grey image dark pixel threshold for pre-proc
+            const int thr_pix_rng = 48,     // grey image pixel range threshold for pre-proc
+            const int thr_pix_min = 160,    // grey image dark pixel threshold for pre-proc
             const int thr_bgr_rng = 20,     // range in BGR required for color matching step
             const double thr_sqdiff = 0.18);
 

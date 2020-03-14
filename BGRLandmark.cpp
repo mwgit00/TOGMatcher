@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2019 Mark Whitney
+// Copyright(c) 2020 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -190,7 +190,7 @@ namespace cpoz
 
             // a landmark ROI should have two dark squares and and two light squares
             // see if ROI has large range in pixel values and a minimum that is sufficiently dark
-            if ((rng_roi > thr_pix_rng) && (min_roi < thr_pix_min))
+            if ((rng_roi >= thr_pix_rng) && (min_roi <= thr_pix_min))
             {
                 // start filling in landmark info
                 landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi, -1, 0.0 };
