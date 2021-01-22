@@ -13,3 +13,16 @@ I originally developed the code in Visual Studio 2015 on a Windows 7 64-bit mach
 ## Camera
 
 I tested with a Logitech c270.  It was the cheapest one I could find that I could purchase locally.  It was plug-and-play.
+
+## Videos
+
+Click the image for YouTube demo video of template matching with X and Y gradients:
+
+[![Gradient Template Demo Video](http://img.youtube.com/vi/ig1yWjleeh4/0.jpg)](http://www.youtube.com/watch?v=ig1yWjleeh4)
+
+Click the image for YouTube demo video of colored landmark detection:
+
+[![Gradient Template Demo Video](http://img.youtube.com/vi/Bcs7QB3FEc0/0.jpg)](http://www.youtube.com/watch?v=Bcs7QB3FEc0)
+
+
+
