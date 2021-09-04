@@ -70,7 +70,6 @@ int n_record_ctr = 0;
 
 const std::vector<T_file_info> vfiles =
 {
-    { 0.00, 1.0, "bgrlm9.png"},
     { 0.00, 1.0, "circle_b_on_w.png"},
     { 0.00, 1.0, "bottle_20perc_top_b_on_w.png"},
     { 0.00, 1.0, "bottle_20perc_curve_b_on_w.png"},
