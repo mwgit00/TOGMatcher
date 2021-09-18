@@ -396,13 +396,28 @@ void loop2(void)
 	
 	// need a 0 as argument
 	VideoCapture vcap(0);
-	if (!vcap.isOpened())
+
+#if 0
+    // can experiment with big capture size and more saturated colors
+    vcap.set(cv::CAP_PROP_FRAME_WIDTH, 1280);
+    vcap.set(cv::CAP_PROP_FRAME_HEIGHT, 720);
+    vcap.set(cv::CAP_PROP_SATURATION, 64);
+#endif
+
+    if (!vcap.isOpened())
 	{
 		std::cout << "Failed to open VideoCapture device!" << std::endl;
 		///////
 		return;
 		///////
 	}
+
+    std::cout << "FPS    " << vcap.get(cv::CAP_PROP_FPS) << std::endl;
+    std::cout << "WIDTH  " << vcap.get(cv::CAP_PROP_FRAME_WIDTH) << std::endl;
+    std::cout << "HEIGHT " << vcap.get(cv::CAP_PROP_FRAME_HEIGHT) << std::endl;
+    std::cout << "BRIGHT " << vcap.get(cv::CAP_PROP_BRIGHTNESS) << std::endl;
+    std::cout << "CON    " << vcap.get(cv::CAP_PROP_CONTRAST) << std::endl;
+    std::cout << "SAT    " << vcap.get(cv::CAP_PROP_SATURATION) << std::endl;
 
 	// camera is ready so grab a first image to determine its full size
 	vcap >> img;
@@ -426,6 +441,24 @@ void loop2(void)
             static_cast<int>(capture_size.width * img_scale),
             static_cast<int>(capture_size.height * img_scale));
         resize(img, img_viewer, viewer_size);
+
+        if (theKnobs.get_snapshot_enabled())
+        {
+            // color space experiments
+            Mat img_csp;
+            Mat img_channels[3];
+            cvtColor(img_viewer, img_csp, COLOR_BGR2HSV);
+            split(img_csp, img_channels);
+            imwrite("cspX.png", img_viewer);
+            imwrite("csp0.png", img_channels[0]);
+            imwrite("csp1.png", img_channels[1]);
+            imwrite("csp2.png", img_channels[2]);
+            split(img_viewer, img_channels);
+            imwrite("cspB.png", img_channels[0]);
+            imwrite("cspG.png", img_channels[1]);
+            imwrite("cspR.png", img_channels[2]);
+            theKnobs.toggle_snapshot_enabled();
+        }
 
         // combine all channels into grayscale
         cvtColor(img_viewer, img_gray, COLOR_BGR2GRAY);

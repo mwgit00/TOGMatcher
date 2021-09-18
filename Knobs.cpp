@@ -31,6 +31,7 @@ Knobs::Knobs() :
     is_equ_hist_enabled(false),
     is_mask_enabled(false),
     is_record_enabled(false),
+    is_snapshot_enabled(false),
     kpreblur(1),
     kcliplimit(4),
     nchannel(Knobs::ALL_CHANNELS),
@@ -75,6 +76,7 @@ void Knobs::show_help(void) const
     std::cout << "e   Toggle histogram equalization" << std::endl;
     std::cout << "m   Toggle mask mode for template matching" << std::endl;
     std::cout << "r   Toggle recording mode" << std::endl;
+    std::cout << "s   Set HSV snapshot mode for BGRLandmark (one-shot)" << std::endl;
     std::cout << "t   Select next template from collection" << std::endl;
     std::cout << "v   Create video from files in movie folder" << std::endl;
     std::cout << "?   Display this help info" << std::endl;
@@ -184,6 +186,11 @@ void Knobs::handle_keypress(const char ckey)
             is_op_required = true;
             op_id = Knobs::OP_RECORD;
             toggle_record_enabled();
+            break;
+        }
+        case 's':
+        {
+            is_snapshot_enabled = true;
             break;
         }
         case 't':

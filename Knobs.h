@@ -70,6 +70,9 @@ public:
     bool get_record_enabled(void) const { return is_record_enabled; }
     void toggle_record_enabled(void) { is_record_enabled = !is_record_enabled; }
 
+    bool get_snapshot_enabled(void) const { return is_snapshot_enabled; }
+    void toggle_snapshot_enabled(void) { is_snapshot_enabled = !is_snapshot_enabled; }
+
     int get_pre_blur(void) const { return kpreblur; }
     void inc_pre_blur(void) { kpreblur = (kpreblur < 35) ? kpreblur + 2 : kpreblur; }
     void dec_pre_blur(void) { kpreblur = (kpreblur > 1) ? kpreblur - 2 : kpreblur; };
@@ -111,6 +114,9 @@ private:
 
     // Flag for enabling recording
     bool is_record_enabled;
+
+    // Flag for enabling a snapshot
+    bool is_snapshot_enabled;
 
     // Amount of Gaussian blurring in preprocessing step
     int kpreblur;

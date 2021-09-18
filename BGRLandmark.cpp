@@ -33,10 +33,10 @@ namespace cpoz
         cv::Scalar(0, 0, 0),        // black
         cv::Scalar(0, 0, 255),      // red
         cv::Scalar(0, 255, 0),      // green
-        cv::Scalar(0, 255, 255),    // yellow
+        cv::Scalar(0, 255, 255),    // yellow   (0,G,R)
         cv::Scalar(255, 0, 0),      // blue
-        cv::Scalar(255, 0, 255),    // magenta
-        cv::Scalar(255, 255, 0),    // cyan
+        cv::Scalar(255, 0, 255),    // magenta  (B,0,R)
+        cv::Scalar(255, 255, 0),    // cyan     (B,G,0)
         cv::Scalar(255, 255, 255),  // white
     };
 
