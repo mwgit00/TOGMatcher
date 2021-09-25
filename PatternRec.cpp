@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2020 Mark Whitney
+// Copyright(c) 2021 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -253,7 +253,7 @@ bool PatternRec::load_samples_from_img(
                 // a "red" border indicates junk but the red in the images has goofy BGR values
                 vv0.push_back(vfeature);
             }
-            else if (lminfo[0].diff < 0)
+            else if (lminfo[0].corr < 0)
             {
                 // this is a "negative" sample
                 vvn.push_back(vfeature);

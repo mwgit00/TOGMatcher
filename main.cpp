@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2020 Mark Whitney
+// Copyright(c) 2021 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -390,7 +390,7 @@ void loop2(void)
     Mat tmatch;
 
     const int kdim = 9;
-    const double dthr = 1.6;
+    const double dthr = 0.8;
 	cpoz::BGRLandmark bgrm;
     bgrm.init(kdim, dthr);
 	
@@ -490,7 +490,7 @@ void loop2(void)
                     {
                         char x[2] = { 0 };
                         x[0] = static_cast<char>(r.code) + 'A';
-                        circle(img_viewer, r.ctr, kdim / 2, (r.diff > 0.0) ? SCA_RED : SCA_BLUE, -1);
+                        circle(img_viewer, r.ctr, kdim / 2, (r.corr > 0.0) ? SCA_RED : SCA_BLUE, -1);
                         circle(img_viewer, r.ctr, 2, SCA_WHITE, -1);
                         putText(img_viewer, std::string(x), r.ctr, FONT_HERSHEY_PLAIN, 2.0, SCA_GREEN, 2);
                     }
@@ -595,7 +595,7 @@ void loop2(void)
                 const Point& tmpl_offset = bgrm.get_template_offset();
                 cvtColor(img_gray, img_viewer, COLOR_GRAY2BGR);
                 normalize(tmatch, tmatch, 0, 1, cv::NORM_MINMAX);
-                match_mask = (tmatch > (dthr / 2.0));
+                match_mask = (tmatch > dthr);
                 findContours(match_mask, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
                 drawContours(img_viewer, contours, -1, SCA_RED, -1, LINE_8, noArray(), INT_MAX, tmpl_offset);
                 max_mode = max_mode_t::RECT;

@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2020 Mark Whitney
+// Copyright(c) 2021 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -147,13 +147,12 @@ namespace cpoz
     {
         const int xmode = cv::TM_CCOEFF_NORMED;
 
-        // match the positive and negative templates
-        // and find absolute difference between the two results
-        cv::Mat tmatch0;
-        cv::Mat tmatch1;
-        matchTemplate(rsrc, tmpl_gray_p, tmatch0, xmode);
-        matchTemplate(rsrc, tmpl_gray_n, tmatch1, xmode);
-        rtmatch = abs(tmatch0 - tmatch1);
+        // match the template
+        // good match will be close to +1.0 or -1.0
+        // so take absolute value of result
+        cv::Mat tmatch;
+        matchTemplate(rsrc, tmpl_gray_p, tmatch, xmode);
+        rtmatch = abs(tmatch);
 
         // find local maxima in the match results...
         cv::Mat maxima_mask;
@@ -172,11 +171,9 @@ namespace cpoz
         // check each maxima...
         for (const auto& rpt : vec_maxima_pts)
         {
-            // positive diff means black in upper-left/lower-right
-            // negative diff means black in lower-left/upper-right
-            float pix_p = tmatch0.at<float>(rpt);
-            float pix_n = tmatch1.at<float>(rpt);
-            float diff = pix_p - pix_n;
+            // positive means black in upper-left/lower-right
+            // negative means black in lower-left/upper-right
+            float corr = tmatch.at<float>(rpt);
 
             // extract region of interest
             const cv::Rect roi = cv::Rect(rpt, tmpl_gray_p.size());
@@ -193,7 +190,7 @@ namespace cpoz
             if ((rng_roi >= thr_pix_rng) && (min_roi <= thr_pix_min))
             {
                 // start filling in landmark info
-                landmark_info_t lminfo{ rpt + tmpl_offset, diff, rng_roi, min_roi, -1, 0.0 };
+                landmark_info_t lminfo{ rpt + tmpl_offset, corr, rng_roi, min_roi, -1, 0.0 };
 
                 cv::Mat img_roi_bgr(rsrc_bgr(roi));
                 cv::Mat img_roi_bgr_filt;
@@ -235,7 +232,7 @@ namespace cpoz
 #endif
                 // sqdiff shape test on filtered, gray, equalized ROI
                 cv::Mat tmatchx;
-                cv::Mat& rtmpl = (lminfo.diff > 0) ? tmpl_gray_p : tmpl_gray_n;
+                cv::Mat& rtmpl = (lminfo.corr > 0) ? tmpl_gray_p : tmpl_gray_n;
                 matchTemplate(img_filt_equ, rtmpl, tmatchx, cv::TM_SQDIFF_NORMED);
                 lminfo.rmatch = tmatchx.at<float>(0, 0);
                 bool is_sqdiff_test_ok = (lminfo.rmatch < thr_sqdiff);
@@ -421,7 +418,7 @@ namespace cpoz
         // sample the corners
         // locations are offset by 1 pixel in X and Y and filtering is 3x3 
         // so each sample will be 9 unique pixels smoothed together
-        if (rinfo.diff > 0)
+        if (rinfo.corr > 0)
         {
             // "positive" landmark
             pg0 = rimg.at<cv::Vec3b>(1, 1);
@@ -480,7 +477,7 @@ namespace cpoz
                 if (pc1n[0] < BGR_EPS) nc1 = 0;
                 if (pc1n[1] < BGR_EPS) nc1 = 1;
                 if (pc1n[2] < BGR_EPS) nc1 = 2;
-                rinfo.code = get_bgr_code(rinfo.diff, nc0, nc1);
+                rinfo.code = get_bgr_code(rinfo.corr, nc0, nc1);
             }
         }
     }
@@ -518,7 +515,7 @@ namespace cpoz
         // sample the corners
         // locations are offset by 1 pixel in X and Y and filtering is 3x3 
         // so each sample will be 9 unique pixels smoothed together
-        if (rinfo.diff > 0)
+        if (rinfo.corr > 0)
         {
             // "positive" landmark
             pg0 = ximg.at<cv::Vec3b>(1, 1);
@@ -550,7 +547,7 @@ namespace cpoz
         int b = (x10.at<uint8_t>(0, 0) & 1) |
             ((x11.at<uint8_t>(0, 0) & 1) << 1) |
             ((x12.at<uint8_t>(0, 0) & 1) << 2);
-        rinfo.code = get_bgr_code(rinfo.diff, bitcode[a], bitcode[b]);
+        rinfo.code = get_bgr_code(rinfo.corr, bitcode[a], bitcode[b]);
     }
 
 

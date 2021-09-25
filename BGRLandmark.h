@@ -1,6 +1,6 @@
 // MIT License
 //
-// Copyright(c) 2020 Mark Whitney
+// Copyright(c) 2021 Mark Whitney
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -40,7 +40,7 @@ namespace cpoz
         typedef struct
         {
             cv::Point ctr;      // center point of landmark
-            double diff;        // value of positive template match minus negative template match
+            double corr;        // value of template match
             double rng;         // range of pixels in candidate ROI
             double min;         // min pixel in candidate ROI
             int code;           // color code, -1 for unknown, else 0-11
@@ -87,7 +87,7 @@ namespace cpoz
         // init with "good" default settings
         void init(
             const int k = 9,
-            const double thr_corr = 1.6,    // threshold for dual match (range is 0.0 to 2.0)
+            const double thr_corr = 0.8,    // threshold for correlation match (range is 0.0 to 1.0)
             const int thr_pix_rng = 48,     // grey image pixel range threshold for pre-proc
             const int thr_pix_min = 160,    // grey image dark pixel threshold for pre-proc
             const int thr_bgr_rng = 20,     // range in BGR required for color matching step
@@ -172,7 +172,7 @@ namespace cpoz
         int thr_bgr_rng;
         double thr_sqdiff;
 
-        // templates for 2x2 checkerboard grid
+        // templates for 2x2 black and white checkerboard grid
         cv::Mat tmpl_gray_p;
         cv::Mat tmpl_gray_n;
 
