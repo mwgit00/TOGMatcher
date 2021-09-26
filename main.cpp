@@ -854,7 +854,8 @@ void test_patt_rec()
     // some experimental stuff with PCA...
     PatternRec prfoo;
 
-    prfoo.load_samples_from_img("samples_1K_9keep2.png");
+    prfoo.load_samples_from_img("samples_1K_all_bad.png");
+    //prfoo.load_samples_from_img("samples_1K_9x9_bgr.png");
 
     //prfoo.load_samples_from_img("samples_1K_9x9_markup.png");
     //prfoo.load_samples_from_img("samples_1K_9x9_markup2.png");

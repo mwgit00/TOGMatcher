@@ -191,8 +191,10 @@ bool PatternRec::load_samples_from_img(
 
     // now that dimension is known a BGRLandmark matcher can be created
     cpoz::BGRLandmark bgrm;
+    cpoz::BGRLandmark bgrm2;
     bgrm.init(kdim);
     bgrm.set_color_id_enable(false);
+    bgrm2.init(kdim);
 
     // temporary vectors for the data...
     std::vector<std::vector<double>> vvp;
@@ -206,6 +208,7 @@ bool PatternRec::load_samples_from_img(
 #endif
 
     // loop through all the sample images...
+    std::vector<double> scores;
     for (int j = 0; j < SAMP_NUM_Y; j++)
     {
         for (int i = 0; i < SAMP_NUM_X; i++)
@@ -241,7 +244,12 @@ bool PatternRec::load_samples_from_img(
             // these should all match because they were captured with same settings
             cv::Mat img_match;
             std::vector<cpoz::BGRLandmark::landmark_info_t> lminfo;
-            bgrm.perform_match(img(roi), img_roi, img_match, lminfo);
+            //cv::imwrite("xxx.png", img(roi));
+            bgrm2.perform_match(img(roi), img_roi, img_match, lminfo);
+            if (lminfo.size())
+            {
+                scores.push_back(lminfo[0].min);
+            }
 
             std::vector<double> vfeature;
             dct_fv.pattern_to_features(img_roi, vfeature);
@@ -265,6 +273,9 @@ bool PatternRec::load_samples_from_img(
             }
         }
     }
+
+    std::sort(scores.begin(), scores.end());
+    std::cout << scores[scores.size()/2] << std::endl;
 
 #if 0
     for (int i = 0; i < 4; i++)

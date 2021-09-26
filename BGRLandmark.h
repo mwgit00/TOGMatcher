@@ -89,9 +89,9 @@ namespace cpoz
             const int k = 9,
             const double thr_corr = 0.8,    // threshold for correlation match (range is 0.0 to 1.0)
             const int thr_pix_rng = 48,     // grey image pixel range threshold for pre-proc
-            const int thr_pix_min = 160,    // grey image dark pixel threshold for pre-proc
+            const int thr_pix_min = 140,    // grey image dark pixel threshold for pre-proc
             const int thr_bgr_rng = 20,     // range in BGR required for color matching step
-            const double thr_sqdiff = 0.18);
+            const double thr_sqdiff = 0.15);
 
         // runs the match on an original BGR image and possibly pre-processed gray image
         // it returns a gray image with the raw template match and a vector of landmark info

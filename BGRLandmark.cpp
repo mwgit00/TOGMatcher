@@ -160,7 +160,6 @@ namespace cpoz
         cv::compare(rtmatch, maxima_mask, maxima_mask, cv::CMP_GE);
 
         // then apply absolute threshold to get the best local maxima
-        std::vector<std::vector<cv::Point>> contours;
         cv::Mat match_masked = (rtmatch > thr_corr);
         maxima_mask = maxima_mask & match_masked;
 
@@ -175,11 +174,11 @@ namespace cpoz
             // negative means black in lower-left/upper-right
             float corr = tmatch.at<float>(rpt);
 
-            // extract region of interest
+            // extract gray region of interest
             const cv::Rect roi = cv::Rect(rpt, tmpl_gray_p.size());
             cv::Mat img_roi(rsrc(roi));
 
-            // get pixel range stats in ROI
+            // get gray pixel range stats in ROI
             double min_roi;
             double max_roi;
             cv::minMaxLoc(img_roi, &min_roi, &max_roi);
@@ -198,17 +197,16 @@ namespace cpoz
                 // do smoothing of BGR ROI prior to color test
                 cv::medianBlur(img_roi_bgr, img_roi_bgr_filt, 3);
 
-                // then convert filtered image to gray and equalize
+                // equalize gray ROI
                 cv::Mat img_filt_equ;
-                cv::cvtColor(img_roi_bgr_filt, img_filt_equ, cv::COLOR_BGR2GRAY);
-                cv::equalizeHist(img_filt_equ, img_filt_equ);
+                cv::equalizeHist(img_roi, img_filt_equ);
 
 #ifdef _COLLECT_SAMPLES
                 if (samp_ct < 1000)
                 {
-                    cv::Mat img_samp;
+                    cv::Mat img_samp = img_roi_bgr;
                     //cv::cvtColor(img_filt_equ, img_samp, cv::COLOR_GRAY2BGR);
-                    cv::cvtColor(img_roi_bgr_filt, img_samp, cv::COLOR_BGR2HSV);
+                    //cv::cvtColor(img_roi_bgr_filt, img_samp, cv::COLOR_BGR2HSV);
 
                     int k = tmpl_gray_p.size().width + 4;
                     int x = (samp_ct % sampx) * k;
@@ -232,7 +230,7 @@ namespace cpoz
 #endif
                 // sqdiff shape test on filtered, gray, equalized ROI
                 cv::Mat tmatchx;
-                cv::Mat& rtmpl = (lminfo.corr > 0) ? tmpl_gray_p : tmpl_gray_n;
+                cv::Mat& rtmpl = (lminfo.corr > 0.0) ? tmpl_gray_p : tmpl_gray_n;
                 matchTemplate(img_filt_equ, rtmpl, tmatchx, cv::TM_SQDIFF_NORMED);
                 lminfo.rmatch = tmatchx.at<float>(0, 0);
                 bool is_sqdiff_test_ok = (lminfo.rmatch < thr_sqdiff);
